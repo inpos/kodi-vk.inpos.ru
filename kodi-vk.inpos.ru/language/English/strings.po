@@ -1,0 +1,14 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgctxt "#400500"
+msgid "Login:"
+msgstr "Login:"
+
+msgctxt "#400501"
+msgid "Password:"
+msgstr "Password:"
+
