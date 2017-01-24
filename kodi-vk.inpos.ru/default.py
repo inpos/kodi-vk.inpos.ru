@@ -3,6 +3,7 @@ from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
 import urlparse
 from urllib3 import request
+from urllib import urlencode
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
@@ -95,6 +96,18 @@ class KodiVk:
     @property
     def params(self):
         return dict(urlparse.parse_qsl(self.paramstring[1:]))
+    def url(self, __dict_params=dict(), **parameters):
+        __dict_params.update(parameters)
+        return _addon_url + "?" + urlencode(__dict_params)
+    def set_diritem(self, name, params, isFolder = False):
+        if isFolder:
+            url = self.url(**params)
+            item = xbmcgui.ListItem(name)
+            xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = isFolder)
+        else:
+            url = params
+            item = xbmcgui.ListItem(name)
+            xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = isFolder)
     def __connect_(self):
         token = _addon.getSetting(self._token)
         try:
