@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys, os, vk, time
 from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
@@ -7,14 +8,16 @@ from urllib import urlencode
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
-_addon_id   =   int(sys.argv[1])
+#_addon_id   =   int(sys.argv[1])
+_addon_id   =   1 # временно для локальных проверок
 _addon_url  =   sys.argv[0]
 _addon_path =   _addon.getAddonInfo('path').decode('utf-8')
 
 _APP_ID = '4353740'
-_SCOPE  = 'friends,\
-photos,audio,video,docs,notes,pages,status,wall,groups,messages,notifications,\
-stats,'
+_SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
+_TOKEN = 'vk_token'
+_USERNAME = 'vk_username'
+_LOGIN_RETRY = 3
 
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
@@ -32,6 +35,7 @@ class APIMethod(object):
         return self.conn(self._method_name, **method_kwargs)
 
 class Connection(object):
+    '''Соединяемся с сайтом'''
     def __init__(self, app_id, username = None, password = None, access_token = None, scope = ''):
         if access_token:
             session = vk.api.Session(access_token = access_token)
@@ -51,22 +55,32 @@ class Connection(object):
         return res
 
 class Group(object):
+    '''Группа'''
     def __init__(self, gid, conn):
         self.conn = conn
-        self.gid = gid
+        self.id = gid
         self.info = {'id': gid}
+
+class Video(object):
+    def __init__(self, vid, conn):
+        self.conn = conn
+        self.id = vid
+        self.info = {'id': vid}
+    @property
+    def files(self):
+        pass
 
 class User(object):
     '''Этот класс описывает свойства и методы пользователя.'''
     def __init__(self, uid, conn, get_info = True):
         self.conn = conn
-        self.uid = uid
+        self.id = uid
         if get_info:
             self.info = self.conn.users.get(user_id = uid, fields = 'uid,first_name,last_name,photo,photo_medium,online,last_seen')[0]
         else:
             self.info = {'id': uid}
     def friends(self, page_items = 20, index = 1, order = 'hints'):
-        f =  self.conn.friends.get(user_id = self.uid,
+        f =  self.conn.friends.get(user_id = self.id,
                                    offset = ((page_items * index) - page_items),
                                    count=page_items,
                                    fields = 'uid,first_name,last_name,photo,photo_medium,online,last_seen',
@@ -83,53 +97,15 @@ class User(object):
     def groups(self):
         pass
 
-class KodiVk:
-    _token = 'vk_token'
-    _username = 'vk_username'
-    conn = None
-    def __init__(self):
-        self.paramstring = sys.argv[2]
-        self.conn = self.__connect_()
-        self.u = User(self.conn.users.get()[0]['uid'], self.conn)
+class KodiVkGUI:
+    '''Окошки, диалоги, сообщения'''
     def _string(self, string_id):
         return _addon.getLocalizedString(string_id).encode('utf-8')
-    @property
-    def params(self):
-        return dict(urlparse.parse_qsl(self.paramstring[1:]))
-    def url(self, __dict_params=dict(), **parameters):
-        __dict_params.update(parameters)
-        return _addon_url + "?" + urlencode(__dict_params)
-    def set_diritem(self, name, params, isFolder = False):
-        if isFolder:
-            url = self.url(**params)
-            item = xbmcgui.ListItem(name)
-            xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = isFolder)
-        else:
-            url = params
-            item = xbmcgui.ListItem(name)
-            xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = isFolder)
-    def __connect_(self):
-        token = _addon.getSetting(self._token)
-        try:
-            conn = Connection(access_token = token)
-        except vk.api.VkAuthError:
-            token = None
-            count = 3
-            while not token and count > 0:
-                count -= 1
-                login, password = self.__login_form_()
-                try:
-                    conn = Connection(_APP_ID, login, password, scope = _SCOPE)
-                    token = conn._session.get_access_token()
-                    _addon.setSetting(self._token, token)
-                except vk.api.VkAuthError:
-                    continue
-        return conn
-    def __login_form_(self):
+    def _login_form(self):
         login_window = xbmc.Keyboard()
         login_window.setHeading(self._string(400500))
         login_window.setHiddenInput(False)
-        login_window.setDefault(_addon.getSetting(self._username))
+        login_window.setDefault(_addon.getSetting(_USERNAME))
         login_window.doModal()
         if login_window.isConfirmed():
             username = login_window.getText()
@@ -143,3 +119,42 @@ class KodiVk:
                 raise Exception("Password input was cancelled.")
         else:
             raise Exception("Login input was cancelled.")
+
+class KodiVk:
+    conn = None
+    def __init__(self):
+        self.gui = KodiVkGUI()
+        self.paramstring = sys.argv[2]
+        self.conn = self.__connect_()
+        self.u = User(self.conn.users.get()[0]['uid'], self.conn)
+    @property
+    def params(self):
+        return dict(urlparse.parse_qsl(self.paramstring[1:]))
+    def url(self, params=dict(), **kwparams):
+        params.update(kwparams)
+        return _addon_url + "?" + urlencode(params)
+    def add_folder(self, name, params):
+        url = self.url(**params)
+        item = xbmcgui.ListItem(name)
+        xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = True)
+    def add_play_entry(self, name, url):
+        item = xbmcgui.ListItem(name)
+        xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = False)
+    def __connect_(self):
+        token = _addon.getSetting(_TOKEN)
+        try:
+            conn = Connection(access_token = token)
+        except vk.api.VkAuthError:
+            token = None
+            count = _LOGIN_RETRY
+            while not token and count > 0:
+                count -= 1
+                login, password = self.gui._login_form()
+                try:
+                    conn = Connection(_APP_ID, login, password, scope = _SCOPE)
+                    token = conn._session.get_access_token()
+                    _addon.setSetting(_TOKEN, token)
+                except vk.api.VkAuthError:
+                    continue
+        return conn
+    
