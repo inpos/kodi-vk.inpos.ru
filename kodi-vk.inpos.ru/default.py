@@ -8,14 +8,13 @@ from urllib import urlencode
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
-#_addon_id   =   int(sys.argv[1])
-_addon_id   =   1 # временно для локальных проверок
+_addon_id   =   int(sys.argv[1])
 _addon_url  =   sys.argv[0]
 _addon_path =   _addon.getAddonInfo('path').decode('utf-8')
 
 _APP_ID = '4353740'
 _SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
-_TOKEN = 'vk_token'
+_SETTINGS_TOKEN = 'vk_token'
 _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
 _VK_API_VERSION = '5.62'
@@ -28,6 +27,8 @@ _DO_HOME = 'home'
 _DO_MY_VIDEO = 'my_video'
 _DO_MY_AUDIO = 'my_audio'
 _DO_MY_PHOTO = 'my_photo'
+_DO_FRIENDS = 'friends'
+_DO_GROUPS = 'groups'
 
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
@@ -159,7 +160,7 @@ class KodiVkGUI:
         if login_window.isConfirmed():
             username = login_window.getText()
             password_window = xbmc.Keyboard()
-            password_window.setHeading(self._string(400500))
+            password_window.setHeading(self._string(400501))
             password_window.setHiddenInput(True)
             password_window.doModal()
             if password_window.isConfirmed():
@@ -169,6 +170,7 @@ class KodiVkGUI:
         else:
             raise Exception("Login input was cancelled.")
     def _home(self):
+        xbmc.log('We at HOME')
         c_type = self.root.params.get('content_type', None)
         if not c_type:
             xbmc.log('No content_type')
@@ -182,7 +184,9 @@ class KodiVkGUI:
         else:
             xbmc.log('Unknown content_type: %s' % (c_type,))
             return
-        
+        self.root.add_folder(self._string(400505), {'do': _DO_FRIENDS})
+        self.root.add_folder(self._string(400506), {'do': _DO_GROUPS})
+        xbmcplugin.endOfDirectory(_addon_id)
 
 class KodiVk:
     conn = None
@@ -192,18 +196,14 @@ class KodiVk:
         if sys.argv[2]:
             p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
         self.params = p
+        self.c_type = p.get('content_type', None)
         self.conn = self.__connect_()
         u_info = self.conn.users.get()[0]
         self.u = User(u_info['id'], self.conn)
         self.u.info = u_info
-        
-    @property
-    def params(self):
-        p = {'do': _DO_HOME}
-        if self.paramstring:
-            p.update(dict(urlparse.parse_qsl(self.paramstring[1:])))
-        return p
     def url(self, params=dict(), **kwparams):
+        if self.c_type:
+            kwparams['content_type'] = self.c_type
         params.update(kwparams)
         return _addon_url + "?" + urlencode(params)
     def add_folder(self, name, params):
@@ -214,10 +214,9 @@ class KodiVk:
         item = xbmcgui.ListItem(name)
         xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = False)
     def __connect_(self):
-        token = _addon.getSetting(_TOKEN)
-        try:
-            conn = Connection(access_token = token)
-        except vk.api.VkAuthError:
+        token = _addon.getSetting(_SETTINGS_TOKEN)
+        conn = Connection(_APP_ID, access_token = token)
+        if not conn.conn._session.access_token:
             token = None
             count = _LOGIN_RETRY
             while not token and count > 0:
@@ -225,8 +224,8 @@ class KodiVk:
                 login, password = self.gui._login_form()
                 try:
                     conn = Connection(_APP_ID, login, password, scope = _SCOPE)
-                    token = conn._session.get_access_token()
-                    _addon.setSetting(_TOKEN, token)
+                    token = conn.conn._session.access_token
+                    _addon.setSetting(_SETTINGS_TOKEN, token)
                 except vk.api.VkAuthError:
                     continue
         return conn

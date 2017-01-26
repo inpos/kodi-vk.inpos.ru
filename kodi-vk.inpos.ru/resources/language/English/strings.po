@@ -31,3 +31,7 @@ msgstr "Friends"
 msgctxt "#400506"
 msgid "Groups"
 msgstr "Groups"
+
+msgctxt "#400507"
+msgid "Access token"
+msgstr "Access token"
