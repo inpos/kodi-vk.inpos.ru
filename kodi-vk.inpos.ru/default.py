@@ -19,6 +19,8 @@ _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
 _VK_API_VERSION = '5.62'
 
+_PHOTO_THUMB_KEY = 'photo_130'
+
 _CTYPE_VIDEO = 'video'
 _CTYPE_AUDIO = 'audio'
 _CTYPE_IMAGE = 'image'
@@ -27,8 +29,11 @@ _DO_HOME = 'home'
 _DO_MY_VIDEO = 'my_video'
 _DO_MY_AUDIO = 'my_audio'
 _DO_MY_PHOTO = 'my_photo'
+_DO_ALL_PHOTO = 'all_photo'
 _DO_FRIENDS = 'friends'
 _DO_GROUPS = 'groups'
+
+
 
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
@@ -77,6 +82,36 @@ class Group(object):
         return self.conn.groups.getById(group_id = self.id, fields = 'counters')
     def videos(self, page_items = 20, page = 1, album = None):
         return videos(self.conn, -self.id, page_items, page, album)
+
+class Photo(object):
+    def __init__(self, pid, conn):
+        self.conn = conn
+        self.id = pid
+        self.info = {}
+    @property
+    def url(self):
+        k = filter(lambda x: x.startswith('photo_'), self.info.keys())
+        key_ = u'photo_' + str(max([int(x.split('_')[1]) for x in k])).decode('utf-8')
+        return self.info[key_]
+    
+def photos(conn, oid, page_items = 20, page = 1, album = None):
+    if album:
+        photos = conn.photos.get(owner_id = oid,
+                                 offset = ((page_items * page) - page_items),
+                                 count = page_items,
+                                 album_id = album)
+    else:
+        photos = conn.photos.getAll(owner_id = oid,
+                                 offset = ((page_items * page) - page_items),
+                                 count = page_items)
+    count = photos['count']
+    pages = ceil(count / page_items)
+    l = []
+    for i in photos['items']:
+        ph = Photo(i['id'], conn)
+        ph.info = i
+        l.append(ph)
+    return {'pages': pages, 'total': count, 'items': l}
 
 def videos(conn, oid, page_items = 20, page = 1, album = None):
     if album:
@@ -145,6 +180,14 @@ class User(object):
     def videos(self, page_items = 20, page = 1, album = None):
         return videos(self.conn, self.id, page_items, page, album)
 
+class KodiVKGUIPhotos(object):
+    def __init__(self, root):
+        self.root = root
+    def _my_photo(self):
+        self.root.add_folder(self.root.gui._string(400508), {'do': _DO_ALL_PHOTO, 'oid': self.root.u.id, 'page': 1})
+        xbmcplugin.endOfDirectory(_addon_id)
+
+
 class KodiVkGUI:
     '''Окошки, диалоги, сообщения'''
     def __init__(self, root):
@@ -170,7 +213,6 @@ class KodiVkGUI:
         else:
             raise Exception("Login input was cancelled.")
     def _home(self):
-        xbmc.log('We at HOME')
         c_type = self.root.params.get('content_type', None)
         if not c_type:
             xbmc.log('No content_type')
@@ -187,11 +229,12 @@ class KodiVkGUI:
         self.root.add_folder(self._string(400505), {'do': _DO_FRIENDS})
         self.root.add_folder(self._string(400506), {'do': _DO_GROUPS})
         xbmcplugin.endOfDirectory(_addon_id)
-
+    
 class KodiVk:
     conn = None
     def __init__(self):
         self.gui = KodiVkGUI(self)
+        self.gui_photos = KodiVKGUIPhotos(self)
         p = {'do': _DO_HOME}
         if sys.argv[2]:
             p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
@@ -232,5 +275,12 @@ class KodiVk:
 
 if __name__ == '__main__':
     kvk = KodiVk()
-    if kvk.params['do'] == _DO_HOME:
-        kvk.gui._home()
+    
+    _DO = {
+       _DO_HOME: kvk.gui._home,
+       _DO_MY_PHOTO: kvk.gui_photos._my_photo
+       }
+    
+    _do_method = kvk.params['do']
+    if _do_method in _DO.keys():
+        _DO[_do_method]()

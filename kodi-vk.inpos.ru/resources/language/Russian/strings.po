@@ -35,3 +35,7 @@ msgstr "Сообщества"
 msgctxt "#400507"
 msgid "Access token"
 msgstr "Токен доступа"
+
+msgctxt "#400508"
+msgid "All Photos"
+msgstr "Все фотографии"

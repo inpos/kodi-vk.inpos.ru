@@ -35,3 +35,7 @@ msgstr "Groups"
 msgctxt "#400507"
 msgid "Access token"
 msgstr "Access token"
+
+msgctxt "#400508"
+msgid "All Photos"
+msgstr "All Photos"
