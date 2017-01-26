@@ -61,29 +61,50 @@ class Group(object):
     def __init__(self, gid, conn):
         self.conn = conn
         self.id = gid
-        self.info = {'id': gid}
+        self.info = {}
+    @property
+    def counters(self):
+        return self.conn.groups.getById(group_id = self.id, fields = 'counters')
+    def videos(self, page_items = 20, page = 1, album = None):
+        return videos(self.conn, -self.id, page_items, page, album)
+
+def videos(conn, oid, page_items = 20, page = 1, album = None):
+    if album:
+        vids = conn.video.get(owner_id = oid,
+                          offset = ((page_items * page) - page_items),
+                          count = page_items)
+    else:
+        vids = conn.video.get(owner_id = oid,
+                          offset = ((page_items * page) - page_items),
+                          count = page_items,
+                          album_id = album)
+    count = vids['count']
+    pages = ceil(count / page_items)
+    l = []
+    for i in vids['items']:
+        v = Video(i['id'], conn)
+        v.info = i
+        l.append(v)
+    return {'pages': pages, 'total': count, 'items': l}
 
 class Video(object):
     def __init__(self, vid, conn):
         self.conn = conn
         self.id = vid
-        self.info = {'id': vid}
+        self.info = {}
     @property
     def files(self):
         pass
 
 class User(object):
     '''Этот класс описывает свойства и методы пользователя.'''
-    def __init__(self, uid, conn, get_info = True):
+    def __init__(self, uid, conn):
         self.conn = conn
         self.id = uid
-        if get_info:
-            self.info = self.conn.users.get(user_id = uid, fields = 'first_name,last_name,photo,photo_medium')[0]
-        else:
-            self.info = {'id': uid}
-    def friends(self, page_items = 20, index = 1, order = 'hints'):
+        self.info = {}
+    def friends(self, page_items = 20, page = 1, order = 'hints'):
         f =  self.conn.friends.get(user_id = self.id,
-                                   offset = ((page_items * index) - page_items),
+                                   offset = ((page_items * page) - page_items),
                                    count = page_items,
                                    fields = 'first_name,last_name,photo_50,photo_100,photo_200',
                                    order = order)
@@ -91,25 +112,28 @@ class User(object):
         pages = ceil(count / page_items)
         l = []
         for i in f['items']:
-            u = User(i['id'], self.conn, get_info = False)
+            u = User(i['id'], self.conn)
             u.info = i
             l.append(u)
         return {'pages': pages, 'total': count, 'items': l}
 
-    def groups(self, page_items = 20, index = 1):
+    def groups(self, page_items = 20, page = 1):
         gr = self.conn.groups.get(user_id = self.id,
-                                 offset = ((page_items * index) - page_items),
+                                 offset = ((page_items * page) - page_items),
                                  count = page_items,
-                                 fields = 'name,description,is_closed,deactivated,is_member,photo_50,photo_100,photo_200,counters,age_limits',
+                                 fields = 'name,description,is_closed,deactivated,is_member,photo_50,photo_100,photo_200,age_limits',
                                  extended = 1)
         count = gr['count']
         pages = ceil(count / page_items)
         l = []
         for i in gr['items']:
-            g = Group(i['id'], self.conn, get_info = False)
+            if i['is_closed'] > 0 and i['is_member'] == 0: continue
+            g = Group(i['id'], self.conn)
             g.info = i
             l.append(g)
         return {'pages': pages, 'total': count, 'items': l}
+    def videos(self, page_items = 20, page = 1, album = None):
+        return videos(self.conn, self.id, page_items, page, album)
 
 class KodiVkGUI:
     '''Окошки, диалоги, сообщения'''
@@ -140,7 +164,9 @@ class KodiVk:
         self.gui = KodiVkGUI()
         self.paramstring = sys.argv[2]
         self.conn = self.__connect_()
-        self.u = User(self.conn.users.get()[0]['id'], self.conn)
+        u_info = self.conn.users.get()[0]
+        self.u = User(u_info['id'], self.conn)
+        self.u.info = u_info
     @property
     def params(self):
         return dict(urlparse.parse_qsl(self.paramstring[1:]))
