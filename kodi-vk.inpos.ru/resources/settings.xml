@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+	<setting id="vk_token" type="text" label="400507" default="" option="hidden" />
+</settings>

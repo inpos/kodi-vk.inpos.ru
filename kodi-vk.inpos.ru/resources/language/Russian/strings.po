@@ -6,32 +6,32 @@ msgstr ""
 
 msgctxt "#400500"
 msgid "Login:"
-msgstr "Login:"
+msgstr "Логин:"
 
 msgctxt "#400501"
 msgid "Password:"
-msgstr "Password:"
+msgstr "Пароль:"
 
 msgctxt "#400502"
 msgid "My video"
-msgstr "My video"
+msgstr "Мои видеозаписи"
 
 msgctxt "#400503"
 msgid "My audio"
-msgstr "My audio"
+msgstr "Мои аудиозаписи"
 
 msgctxt "#400504"
 msgid "My photo"
-msgstr "My photo"
+msgstr "Мои фотографии"
 
 msgctxt "#400505"
 msgid "Friends"
-msgstr "Friends"
+msgstr "Друзья"
 
 msgctxt "#400506"
 msgid "Groups"
-msgstr "Groups"
+msgstr "Сообщества"
 
 msgctxt "#400507"
 msgid "Access token"
-msgstr "Access token"
+msgstr "Токен доступа"
