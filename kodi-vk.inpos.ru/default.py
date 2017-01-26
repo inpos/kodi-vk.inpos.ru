@@ -18,6 +18,7 @@ _SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
 _TOKEN = 'vk_token'
 _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
+_VK_API_VERSION = '5.62'
 
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
@@ -50,6 +51,7 @@ class Connection(object):
         delay = DELAY - (time.time() - self.last_request)
         if delay > 0:
             time.sleep(delay)
+        if 'v' not in method_kwargs: method_kwargs['v'] = _VK_API_VERSION
         res = self.conn(method_name, **method_kwargs)
         self.last_request = time.time()
         return res
@@ -76,14 +78,14 @@ class User(object):
         self.conn = conn
         self.id = uid
         if get_info:
-            self.info = self.conn.users.get(user_id = uid, fields = 'uid,first_name,last_name,photo,photo_medium,online,last_seen')[0]
+            self.info = self.conn.users.get(user_id = uid, fields = 'first_name,last_name,photo,photo_medium')[0]
         else:
             self.info = {'id': uid}
     def friends(self, page_items = 20, index = 1, order = 'hints'):
         f =  self.conn.friends.get(user_id = self.id,
                                    offset = ((page_items * index) - page_items),
-                                   count=page_items,
-                                   fields = 'uid,first_name,last_name,photo,photo_medium,online,last_seen',
+                                   count = page_items,
+                                   fields = 'first_name,last_name,photo_50,photo_100,photo_200',
                                    order = order)
         count = f['count']
         pages = ceil(count / page_items)
@@ -94,8 +96,20 @@ class User(object):
             l.append(u)
         return {'pages': pages, 'total': count, 'items': l}
 
-    def groups(self):
-        pass
+    def groups(self, page_items = 20, index = 1):
+        gr = self.conn.groups.get(user_id = self.id,
+                                 offset = ((page_items * index) - page_items),
+                                 count = page_items,
+                                 fields = 'name,description,is_closed,deactivated,is_member,photo_50,photo_100,photo_200,counters,age_limits',
+                                 extended = 1)
+        count = gr['count']
+        pages = ceil(count / page_items)
+        l = []
+        for i in gr['items']:
+            g = Group(i['id'], self.conn, get_info = False)
+            g.info = i
+            l.append(g)
+        return {'pages': pages, 'total': count, 'items': l}
 
 class KodiVkGUI:
     '''Окошки, диалоги, сообщения'''
@@ -126,7 +140,7 @@ class KodiVk:
         self.gui = KodiVkGUI()
         self.paramstring = sys.argv[2]
         self.conn = self.__connect_()
-        self.u = User(self.conn.users.get()[0]['uid'], self.conn)
+        self.u = User(self.conn.users.get()[0]['id'], self.conn)
     @property
     def params(self):
         return dict(urlparse.parse_qsl(self.paramstring[1:]))
