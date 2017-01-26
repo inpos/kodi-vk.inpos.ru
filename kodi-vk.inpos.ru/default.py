@@ -20,6 +20,15 @@ _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
 _VK_API_VERSION = '5.62'
 
+_CTYPE_VIDEO = 'video'
+_CTYPE_AUDIO = 'audio'
+_CTYPE_IMAGE = 'image'
+
+_DO_HOME = 'home'
+_DO_MY_VIDEO = 'my_video'
+_DO_MY_AUDIO = 'my_audio'
+_DO_MY_PHOTO = 'my_photo'
+
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
 # Служебные классы
@@ -137,6 +146,8 @@ class User(object):
 
 class KodiVkGUI:
     '''Окошки, диалоги, сообщения'''
+    def __init__(self, root):
+        self.root = root
     def _string(self, string_id):
         return _addon.getLocalizedString(string_id).encode('utf-8')
     def _login_form(self):
@@ -157,19 +168,41 @@ class KodiVkGUI:
                 raise Exception("Password input was cancelled.")
         else:
             raise Exception("Login input was cancelled.")
+    def _home(self):
+        c_type = self.root.params.get('content_type', None)
+        if not c_type:
+            xbmc.log('No content_type')
+            return
+        if c_type == _CTYPE_VIDEO:
+            self.root.add_folder(self._string(400502), {'do': _DO_MY_VIDEO})
+        elif c_type == _CTYPE_AUDIO:
+            self.root.add_folder(self._string(400503), {'do': _DO_MY_AUDIO})
+        elif c_type == _CTYPE_IMAGE:
+            self.root.add_folder(self._string(400504), {'do': _DO_MY_PHOTO})
+        else:
+            xbmc.log('Unknown content_type: %s' % (c_type,))
+            return
+        
 
 class KodiVk:
     conn = None
     def __init__(self):
-        self.gui = KodiVkGUI()
-        self.paramstring = sys.argv[2]
+        self.gui = KodiVkGUI(self)
+        p = {'do': _DO_HOME}
+        if sys.argv[2]:
+            p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
+        self.params = p
         self.conn = self.__connect_()
         u_info = self.conn.users.get()[0]
         self.u = User(u_info['id'], self.conn)
         self.u.info = u_info
+        
     @property
     def params(self):
-        return dict(urlparse.parse_qsl(self.paramstring[1:]))
+        p = {'do': _DO_HOME}
+        if self.paramstring:
+            p.update(dict(urlparse.parse_qsl(self.paramstring[1:])))
+        return p
     def url(self, params=dict(), **kwparams):
         params.update(kwparams)
         return _addon_url + "?" + urlencode(params)
@@ -197,4 +230,8 @@ class KodiVk:
                 except vk.api.VkAuthError:
                     continue
         return conn
-    
+
+if __name__ == '__main__':
+    kvk = KodiVk()
+    if kvk.params['do'] == _DO_HOME:
+        kvk.gui._home()

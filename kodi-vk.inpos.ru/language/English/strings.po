@@ -12,3 +12,22 @@ msgctxt "#400501"
 msgid "Password:"
 msgstr "Password:"
 
+msgctxt "#400502"
+msgid "Videos"
+msgstr "My video"
+
+msgctxt "#400503"
+msgid "My audio"
+msgstr "My audio"
+
+msgctxt "#400504"
+msgid "My photo"
+msgstr "My photo"
+
+msgctxt "#400505"
+msgid "Friends"
+msgstr "Friends"
+
+msgctxt "#400506"
+msgid "Groups"
+msgstr "Groups"
