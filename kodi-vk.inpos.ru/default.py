@@ -3,8 +3,12 @@ import sys, os, vk, time
 from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
 import urlparse
-from urllib3 import request
+import urllib2
 from urllib import urlencode
+import re
+import simplejson as json
+
+_VERSION = '0.0.1'
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
@@ -27,13 +31,17 @@ _CTYPE_IMAGE = 'image'
 
 _DO_HOME = 'home'
 _DO_MY_VIDEO = 'my_video'
+_DO_ALL_VIDEO = 'all_video'
+_DO_PLAY_VIDEO = 'play_video'
 _DO_MY_AUDIO = 'my_audio'
 _DO_MY_PHOTO = 'my_photo'
 _DO_ALL_PHOTO = 'all_photo'
 _DO_FRIENDS = 'friends'
 _DO_GROUPS = 'groups'
 
-
+_VK_VIDEO_SOURCE = 'vk_video'
+_YOUTUBE_VIDEO_SOURCE = 'youtube_video'
+_UNKNOWN_VIDEO_SOURCE = 'unknown_video'
 
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
@@ -105,7 +113,7 @@ def photos(conn, oid, page_items = 20, page = 1, album = None):
                                  offset = ((page_items * page) - page_items),
                                  count = page_items)
     count = photos['count']
-    pages = ceil(count / page_items)
+    pages = int(ceil(count / float(page_items)))
     l = []
     for i in photos['items']:
         ph = Photo(i['id'], conn)
@@ -124,10 +132,11 @@ def videos(conn, oid, page_items = 20, page = 1, album = None):
                           count = page_items,
                           album_id = album)
     count = vids['count']
-    pages = ceil(count / page_items)
+    pages = int(ceil(count / float(page_items)))
     l = []
     for i in vids['items']:
-        v = Video(i['id'], conn)
+        vid = str(i['owner_id']) + '_' + str(i['id'])
+        v = Video(vid, conn)
         v.info = i
         l.append(v)
     return {'pages': pages, 'total': count, 'items': l}
@@ -138,8 +147,10 @@ class Video(object):
         self.id = vid
         self.info = {}
     @property
-    def files(self):
-        pass
+    def v_url(self):
+        return self.info['player']
+    def set_info(self):
+        self.info = self.conn.video.get(videos = self.id)['items'][0]
 
 class User(object):
     '''Этот класс описывает свойства и методы пользователя.'''
@@ -187,11 +198,64 @@ class KodiVKGUIPhotos(object):
         self.root.add_folder(self.root.gui._string(400508), {'do': _DO_ALL_PHOTO, 'oid': self.root.u.id, 'page': 1})
         xbmcplugin.endOfDirectory(_addon_id)
 
+class KodiVKGUIVideos(object):
+    def __init__(self, root):
+        self.root = root
+    def __get_video_source_(self, v):
+        is_vk_url_re = re.compile('https?\:\/\/[^\/]*vk.com\/.*')
+        is_youtube_url_re = re.compile('https\:\/\/www.youtube.com\/.*')
+        player_url = v.info['player']
+        if len(is_vk_url_re.findall(player_url)) > 0: return _VK_VIDEO_SOURCE
+        if len(is_youtube_url_re.findall(player_url)) > 0: return _YOUTUBE_VIDEO_SOURCE
+        return _UNKNOWN_VIDEO_SOURCE
+        
+    def _my_video(self):
+        self.root.add_folder(self.root.gui._string(400509), {'do': _DO_ALL_VIDEO, 'oid': self.root.u.id, 'page': 1})
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _all_video(self):
+        page = int(self.root.params['page'])
+        oid = self.root.params['oid']
+        if page > 1:
+            self.root.add_folder(self.root.gui._string(400601), {'do': _DO_ALL_VIDEO, 'oid': self.root.u.id, 'page': page - 1})
+        vids = videos(self.root.conn, oid, page = page)
+        xbmc.log('pages: %s, total videos: %s' % (vids['pages'], vids['total']))
+        for v in vids['items']:
+            list_item = xbmcgui.ListItem(v.info['title'])
+            list_item.setInfo('video', {
+                                        'title'     : v.info['title'],
+                                        'duration'  : int(v.info['duration']),
+                                        'plot'      : v.info['description']
+                                        }
+                              )
+            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info['photo_130']})
+            list_item.setProperty('IsPlayable', 'true')
+            v_source = self.__get_video_source_(v)
+            if v_source == _VK_VIDEO_SOURCE:
+                params = {'do': _DO_PLAY_VIDEO, 'vid': v.id}
+                url = self.root.url(**params)
+                xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
+            else:
+                continue
+        if page < vids['pages']:
+            self.root.add_folder(self.root.gui._string(400602), {'do': _DO_ALL_VIDEO, 'oid': self.root.u.id, 'page': page + 1})
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _play_video(self):
+        vid = self.root.params['vid']
+        v = Video(vid, self.root.conn)
+        v.set_info()
+        v_url = v.info['player']
+        paths = self.root.parse_vk_player_html(v_url)
+        ### Здесь должно браться разрешение из настроек
+        k = max(paths.keys())
+        play_item = xbmcgui.ListItem(path = paths[k])
+        xbmcplugin.setResolvedUrl(_addon_id, True, listitem = play_item)
 
 class KodiVkGUI:
     '''Окошки, диалоги, сообщения'''
     def __init__(self, root):
         self.root = root
+        self.photos = KodiVKGUIPhotos(self.root)
+        self.videos = KodiVKGUIVideos(self.root)
     def _string(self, string_id):
         return _addon.getLocalizedString(string_id).encode('utf-8')
     def _login_form(self):
@@ -234,7 +298,6 @@ class KodiVk:
     conn = None
     def __init__(self):
         self.gui = KodiVkGUI(self)
-        self.gui_photos = KodiVKGUIPhotos(self)
         p = {'do': _DO_HOME}
         if sys.argv[2]:
             p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
@@ -272,13 +335,39 @@ class KodiVk:
                 except vk.api.VkAuthError:
                     continue
         return conn
+    def parse_vk_player_html(self, v_url):
+        p = re.compile('var\s+playerParams\s*=\s*(.*?);')
+        headers = {'User-Agent' : 'Kodi-vk/%s (linux gnu)' % (_VERSION,)}
+        req = urllib2.Request(v_url, None, headers)
+        http_res = urllib2.urlopen(req)
+        if http_res.code != 200:
+            return None
+        html = http_res.read()
+        h_c_type = http_res.info()['Content-type'].split('charset=')
+        if len(h_c_type) < 2:
+            cs_re = re.compile('content="text/html; charset=([^"]+)"',  re.I)
+            cs = cs_re.findall(html)[0]
+        else:
+            cs = h_c_type[1].strip()
+        re_res = p.findall(html)
+        if len(re_res) < 1:
+            return None
+        playerParams = json.loads(re_res[0], encoding = cs)
+        v_keys = filter(lambda x: x.startswith('url'), playerParams['params'][0].keys())
+        res = {}
+        for k in v_keys:
+            res[k.lstrip('url')] = playerParams['params'][0][k]
+        return res
 
 if __name__ == '__main__':
     kvk = KodiVk()
     
     _DO = {
        _DO_HOME: kvk.gui._home,
-       _DO_MY_PHOTO: kvk.gui_photos._my_photo
+       _DO_MY_PHOTO: kvk.gui.photos._my_photo,
+       _DO_MY_VIDEO: kvk.gui.videos._my_video,
+       _DO_ALL_VIDEO: kvk.gui.videos._all_video,
+       _DO_PLAY_VIDEO: kvk.gui.videos._play_video
        }
     
     _do_method = kvk.params['do']

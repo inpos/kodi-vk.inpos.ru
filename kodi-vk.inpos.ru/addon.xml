@@ -5,6 +5,7 @@ name="VK Add-on"
 provider-name="inpos">
 <requires>
   <import addon="xbmc.python" version="2.1"/>
+  <import addon="script.module.simplejson" />
 </requires>
 <extension point="xbmc.python.pluginsource" library="default.py">
   <provides>image video audio</provides>

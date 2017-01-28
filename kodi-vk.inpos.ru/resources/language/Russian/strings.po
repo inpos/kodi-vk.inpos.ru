@@ -39,3 +39,17 @@ msgstr "Токен доступа"
 msgctxt "#400508"
 msgid "All Photos"
 msgstr "Все фотографии"
+
+msgctxt "#400509"
+msgid "All Videos"
+msgstr "Все видеозаписи"
+
+
+
+msgctxt "#400601"
+msgid "Previous page"
+msgstr "[B]Предыдущая страница[/B]"
+
+msgctxt "#400602"
+msgid "Next page"
+msgstr "[B]Следующая страница[/B]"

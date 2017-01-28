@@ -39,3 +39,17 @@ msgstr "Access token"
 msgctxt "#400508"
 msgid "All Photos"
 msgstr "All Photos"
+
+msgctxt "#400509"
+msgid "All Videos"
+msgstr "All Videos"
+
+
+
+msgctxt "#400601"
+msgid "Previous page"
+msgstr "[B]Previous page[/B]"
+
+msgctxt "#400602"
+msgid "Next page"
+msgstr "[B]Next page[/B]"
