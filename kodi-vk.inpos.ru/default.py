@@ -6,7 +6,6 @@ import urlparse
 import urllib2
 from urllib import urlencode
 import re
-import simplejson as json
 
 _VERSION = '0.0.1'
 
@@ -336,27 +335,19 @@ class KodiVk:
                     continue
         return conn
     def parse_vk_player_html(self, v_url):
-        p = re.compile('var\s+playerParams\s*=\s*(.*?);')
+        p = re.compile('"url(\d+)":"([^"]+)"')
         headers = {'User-Agent' : 'Kodi-vk/%s (linux gnu)' % (_VERSION,)}
         req = urllib2.Request(v_url, None, headers)
         http_res = urllib2.urlopen(req)
         if http_res.code != 200:
             return None
         html = http_res.read()
-        h_c_type = http_res.info()['Content-type'].split('charset=')
-        if len(h_c_type) < 2:
-            cs_re = re.compile('content="text/html; charset=([^"]+)"',  re.I)
-            cs = cs_re.findall(html)[0]
-        else:
-            cs = h_c_type[1].strip()
         re_res = p.findall(html)
         if len(re_res) < 1:
             return None
-        playerParams = json.loads(re_res[0], encoding = cs)
-        v_keys = filter(lambda x: x.startswith('url'), playerParams['params'][0].keys())
         res = {}
-        for k in v_keys:
-            res[k.lstrip('url')] = playerParams['params'][0][k]
+        for tup in re_res:
+            res[tup[0]] = tup[1].replace('\\', '')
         return res
 
 if __name__ == '__main__':
