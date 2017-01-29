@@ -56,4 +56,4 @@ msgstr "[B]Previous page[/B]"
 
 msgctxt "#400602"
 msgid "Next page"
-msgstr "[B]Next page[/B]"
+msgstr "[B][COLOR green]Next page[/COLOR][/B]"

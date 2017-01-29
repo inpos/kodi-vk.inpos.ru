@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import sys, os, vk, time
+import sys, vk, time
 from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
 import urlparse
@@ -17,7 +17,10 @@ _addon_path =   _addon.getAddonInfo('path').decode('utf-8')
 
 _APP_ID = '4353740'
 _SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
+
 _SETTINGS_TOKEN = 'vk_token'
+_SETTINGS_PAGE_ITEMS = 20
+
 _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
 _VK_API_VERSION = '5.62'
@@ -35,13 +38,14 @@ _DO_VIDEO_ALBUMS = 'video_albums'
 _DO_PLAY_VIDEO = 'play_video'
 _DO_MY_AUDIO = 'my_audio'
 _DO_MY_PHOTO = 'my_photo'
-_DO_ALL_PHOTO = 'all_photo'
+_DO_PHOTO = 'photo'
 _DO_FRIENDS = 'friends'
 _DO_GROUPS = 'groups'
 
 _VK_VIDEO_SOURCE = 'vk_video'
 _YOUTUBE_VIDEO_SOURCE = 'youtube_video'
 _UNKNOWN_VIDEO_SOURCE = 'unknown_video'
+
 
 DELAY = 1.0 / 3  # 3 запроса в секунду
 
@@ -88,10 +92,19 @@ class Group(object):
     @property
     def counters(self):
         return self.conn.groups.getById(group_id = self.id, fields = 'counters')
-    def videos(self, page_items = 20, page = 1, album = None):
+    def videos(self, page_items = _SETTINGS_PAGE_ITEMS, page = 1, album = None):
         return media_entries('video.get', self.conn, -self.id, page_items, page, album)
 
-def media_entries(e_method, conn, oid, page_items = 20, page = 1, album = None, extended = None):
+# Благодарю автора статьи https://habrahabr.ru/post/193374/
+def switch_view():
+    skin_used = xbmc.getSkinDir()
+    if skin_used == 'skin.confluence':
+        xbmc.executebuiltin('Container.SetViewMode(500)') # Вид "Эскизы".
+    elif skin_used == 'skin.aeon.nox':
+        xbmc.executebuiltin('Container.SetViewMode(512)') # Вид "Инфо-стена"
+
+
+def media_entries(e_method, conn, oid, page_items = _SETTINGS_PAGE_ITEMS, page = 1, album = None, extended = None):
     kwargs = {
               'owner_id': oid,
               'offset': ((page_items * page) - page_items),
@@ -134,7 +147,7 @@ class User(object):
         self.conn = conn
         self.id = uid
         self.info = {}
-    def friends(self, page_items = 20, page = 1, order = 'hints'):
+    def friends(self, page_items = _SETTINGS_PAGE_ITEMS, page = 1, order = 'hints'):
         f =  self.conn.friends.get(user_id = self.id,
                                    offset = ((page_items * page) - page_items),
                                    count = page_items,
@@ -149,7 +162,7 @@ class User(object):
             l.append(u)
         return {'pages': pages, 'total': count, 'items': l}
 
-    def groups(self, page_items = 20, page = 1):
+    def groups(self, page_items = _SETTINGS_PAGE_ITEMS, page = 1):
         gr = self.conn.groups.get(user_id = self.id,
                                  offset = ((page_items * page) - page_items),
                                  count = page_items,
@@ -164,16 +177,51 @@ class User(object):
             g.info = i
             l.append(g)
         return {'pages': pages, 'total': count, 'items': l}
-    def videos(self, page_items = 20, page = 1, album = None):
+    def videos(self, page_items = _SETTINGS_PAGE_ITEMS, page = 1, album = None):
         return media_entries('video.get', self.conn, self.id, page_items, page, album)
 
 class KodiVKGUIPhotos(object):
     def __init__(self, root):
         self.root = root
     def _my_photo(self):
-        self.root.add_folder(self.root.gui._string(400508), {'do': _DO_ALL_PHOTO, 'oid': self.root.u.id, 'page': 1})
+        self.root.add_folder(self.root.gui._string(400508), {'do': _DO_PHOTO, 'oid': self.root.u.id, 'page': 1})
         xbmcplugin.endOfDirectory(_addon_id)
-    
+    def _photo(self):
+        page = int(self.root.params['page'])
+        oid = self.root.params['oid']
+        album = self.root.params.get('album', None)
+        kwargs = {'page': page}
+        if album:
+            kwargs['album'] = album
+            photos = media_entries('photos.get', self.root.conn, oid, **kwargs)
+        else:
+            photos = media_entries('photos.getAll', self.root.conn, oid, **kwargs)
+        if page < photos['pages']:
+            params = {'do': _DO_PHOTO,'oid': oid,'page': page + 1}
+            if album: params['album'] = album
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for index in range(len(photos['items'])):
+            p = photos['items'][index]
+            num = (_SETTINGS_PAGE_ITEMS * page) + index + 1
+            list_item = xbmcgui.ListItem('%04d' % (num,))
+            list_item.setInfo('pictures', {
+                                        'title'     : '%04d' % (num,),
+                                        'tagline'      : p.info['text'],
+                                        'exif:resolution': '%d,%d' % (p.info['width'], p.info['height'])
+                                        }
+                              )
+            list_item.setArt({'thumb': p.info['photo_130'], 'icon': p.info['photo_75']})
+            r = map(lambda x: x.split('_')[1], filter(lambda x: x.startswith('photo_'), p.info.keys()))
+            ### Здесь надо подумать над настройкой
+            url_key = max(r)
+            url = p.info['photo_' + url_key]
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
+        if page < photos['pages']:
+            params = {'do': _DO_PHOTO,'oid': oid,'page': page + 1}
+            if album: params['album'] = album
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+        switch_view()
 
 class KodiVKGUIVideos(object):
     def __init__(self, root):
@@ -193,9 +241,10 @@ class KodiVKGUIVideos(object):
     def _video_albums(self):
         page = int(self.root.params['page'])
         oid = self.root.params['oid']
-        if page > 1:
-            self.root.add_folder(self.root.gui._string(400601), {'do': _DO_VIDEO_ALBUMS, 'oid': oid, 'page': page - 1})
         albums = media_entries('video.getAlbums', self.root.conn, oid, extended = 1)
+        if page < albums['pages']:
+            params = {'do': _DO_VIDEO_ALBUMS,'oid': oid,'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
         for a in albums['items']:
             list_item = xbmcgui.ListItem(a.info['title'])
             list_item.setInfo('video', {'title': a.info['title']})
@@ -212,13 +261,13 @@ class KodiVKGUIVideos(object):
         page = int(self.root.params['page'])
         oid = self.root.params['oid']
         album = self.root.params.get('album', None)
-        if page > 1:
-            params = {'do': _DO_VIDEO,'oid': oid,'page': page - 1}
-            if album: params['album'] = album
-            self.root.add_folder(self.root.gui._string(400601), params)
         kwargs = {'page': page}
         if album: kwargs['album'] = album
         vids = media_entries('video.get', self.root.conn, oid, **kwargs)
+        if page < vids['pages']:
+            params = {'do': _DO_VIDEO,'oid': oid,'page': page + 1}
+            if album: params['album'] = album
+            self.root.add_folder(self.root.gui._string(400602), params)
         for v in vids['items']:
             list_item = xbmcgui.ListItem(v.info['title'])
             list_item.setInfo('video', {
@@ -227,7 +276,7 @@ class KodiVKGUIVideos(object):
                                         'plot'      : v.info['description']
                                         }
                               )
-            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info['photo_130']})
+            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info['photo_320']})
             list_item.setProperty('IsPlayable', 'true')
             v_source = self.__get_video_source_(v)
             if v_source == _VK_VIDEO_SOURCE:
@@ -364,6 +413,7 @@ if __name__ == '__main__':
     _DO = {
        _DO_HOME: kvk.gui._home,
        _DO_MY_PHOTO: kvk.gui.photos._my_photo,
+       _DO_PHOTO: kvk.gui.photos._photo,
        _DO_MY_VIDEO: kvk.gui.videos._my_video,
        _DO_VIDEO: kvk.gui.videos._video,
        _DO_VIDEO_ALBUMS: kvk.gui.videos._video_albums,
