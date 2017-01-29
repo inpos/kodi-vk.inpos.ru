@@ -88,68 +88,41 @@ class Group(object):
     def counters(self):
         return self.conn.groups.getById(group_id = self.id, fields = 'counters')
     def videos(self, page_items = 20, page = 1, album = None):
-        return videos(self.conn, -self.id, page_items, page, album)
+        return media_entries('video', self.conn, -self.id, page_items, page, album)
 
-class Photo(object):
-    def __init__(self, pid, conn):
-        self.conn = conn
-        self.id = pid
-        self.info = {}
-    @property
-    def url(self):
-        k = filter(lambda x: x.startswith('photo_'), self.info.keys())
-        key_ = u'photo_' + str(max([int(x.split('_')[1]) for x in k])).decode('utf-8')
-        return self.info[key_]
-    
-def photos(conn, oid, page_items = 20, page = 1, album = None):
+def media_entries(e_type, conn, oid, page_items = 20, page = 1, album = None):
     if album:
-        photos = conn.photos.get(owner_id = oid,
-                                 offset = ((page_items * page) - page_items),
-                                 count = page_items,
-                                 album_id = album)
-    else:
-        photos = conn.photos.getAll(owner_id = oid,
-                                 offset = ((page_items * page) - page_items),
-                                 count = page_items)
-    count = photos['count']
-    pages = int(ceil(count / float(page_items)))
-    l = []
-    for i in photos['items']:
-        ph = Photo(i['id'], conn)
-        ph.info = i
-        l.append(ph)
-    return {'pages': pages, 'total': count, 'items': l}
-
-def videos(conn, oid, page_items = 20, page = 1, album = None):
-    if album:
-        vids = conn.video.get(owner_id = oid,
-                          offset = ((page_items * page) - page_items),
-                          count = page_items)
-    else:
-        vids = conn.video.get(owner_id = oid,
+        entries = getattr(conn, e_type).get(owner_id = oid,
                           offset = ((page_items * page) - page_items),
                           count = page_items,
                           album_id = album)
-    count = vids['count']
+    else:
+        entries = getattr(conn, e_type).get(owner_id = oid,
+                          offset = ((page_items * page) - page_items),
+                          count = page_items)
+    count = entries['count']
     pages = int(ceil(count / float(page_items)))
     l = []
-    for i in vids['items']:
-        vid = str(i['owner_id']) + '_' + str(i['id'])
-        v = Video(vid, conn)
-        v.info = i
-        l.append(v)
+    for i in entries['items']:
+        entry_id = str(i['owner_id']) + '_' + str(i['id'])
+        e = Entry(e_type, entry_id, conn)
+        e.info = i
+        l.append(e)
     return {'pages': pages, 'total': count, 'items': l}
 
-class Video(object):
-    def __init__(self, vid, conn):
+class Entry(object):
+    def __init__(self, e_type, eid, conn):
+        self.type = e_type
+        self.id = eid
         self.conn = conn
-        self.id = vid
         self.info = {}
-    @property
-    def v_url(self):
-        return self.info['player']
     def set_info(self):
-        self.info = self.conn.video.get(videos = self.id)['items'][0]
+        if self.type == 'video':
+            self.info = self.conn.video.get(videos = self.id)['items'][0]
+        elif self.type == 'audio':
+            self.info = self.conn.audio.getById(audios = self.id)['items'][0]
+        elif self.type == 'photos':
+            self.info = self.conn.photos.getById(photos = self.id)['items'][0]
 
 class User(object):
     '''Этот класс описывает свойства и методы пользователя.'''
@@ -188,7 +161,7 @@ class User(object):
             l.append(g)
         return {'pages': pages, 'total': count, 'items': l}
     def videos(self, page_items = 20, page = 1, album = None):
-        return videos(self.conn, self.id, page_items, page, album)
+        return media_entries('video', self.conn, self.id, page_items, page, album)
 
 class KodiVKGUIPhotos(object):
     def __init__(self, root):
@@ -216,8 +189,7 @@ class KodiVKGUIVideos(object):
         oid = self.root.params['oid']
         if page > 1:
             self.root.add_folder(self.root.gui._string(400601), {'do': _DO_ALL_VIDEO, 'oid': self.root.u.id, 'page': page - 1})
-        vids = videos(self.root.conn, oid, page = page)
-        xbmc.log('pages: %s, total videos: %s' % (vids['pages'], vids['total']))
+        vids = media_entries('video', self.root.conn, oid, page = page)
         for v in vids['items']:
             list_item = xbmcgui.ListItem(v.info['title'])
             list_item.setInfo('video', {
@@ -240,10 +212,15 @@ class KodiVKGUIVideos(object):
         xbmcplugin.endOfDirectory(_addon_id)
     def _play_video(self):
         vid = self.root.params['vid']
-        v = Video(vid, self.root.conn)
+        v = Entry('video', vid, self.root.conn)
         v.set_info()
-        v_url = v.info['player']
-        paths = self.root.parse_vk_player_html(v_url)
+        if 'files' in v.info:
+            paths = {}
+            for k in v.info['files'].keys():
+                paths[k.split('_')[1]] = v.info['files'][k]
+        else:
+            v_url = v.info['player']
+            paths = self.root.parse_vk_player_html(v_url)
         ### Здесь должно браться разрешение из настроек
         k = max(paths.keys())
         play_item = xbmcgui.ListItem(path = paths[k])
