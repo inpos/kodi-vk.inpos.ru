@@ -44,6 +44,10 @@ msgctxt "#400509"
 msgid "All Videos"
 msgstr "All Videos"
 
+msgctxt "#400510"
+msgid "Video albums"
+msgstr "Video albums"
+
 
 
 msgctxt "#400601"
