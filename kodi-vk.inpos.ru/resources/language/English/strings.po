@@ -13,16 +13,16 @@ msgid "Password:"
 msgstr "Password:"
 
 msgctxt "#400502"
-msgid "My video"
-msgstr "My video"
+msgid "Video"
+msgstr "Video"
 
 msgctxt "#400503"
-msgid "My audio"
-msgstr "My audio"
+msgid "Audio"
+msgstr "Audio"
 
 msgctxt "#400504"
-msgid "My photo"
-msgstr "My photo"
+msgid "Photo"
+msgstr "Photos"
 
 msgctxt "#400505"
 msgid "Friends"
@@ -48,6 +48,14 @@ msgctxt "#400510"
 msgid "Video albums"
 msgstr "Video albums"
 
+msgctxt "#400511"
+msgid "Photo albums"
+msgstr "Photo albums"
+
+msgctxt "#400512"
+msgid "Members"
+msgstr "Members"
+
 
 
 msgctxt "#400601"
@@ -57,3 +65,11 @@ msgstr "[B]Previous page[/B]"
 msgctxt "#400602"
 msgid "Next page"
 msgstr "[B][COLOR green]Next page[/COLOR][/B]"
+
+msgctxt "#400603"
+msgid "User"
+msgstr "[I][COLOR orange]User:[/COLOR][/I]"
+
+msgctxt "#400604"
+msgid "Group"
+msgstr "[I][COLOR orange]Group:[/COLOR][/I]"
