@@ -94,7 +94,7 @@ class Group(object):
     def set_info(self):
         self.info = self.conn.groups.getById(group_id = int(self.id) * -1)[0]
     def members(self, page_items = _SETTINGS_PAGE_ITEMS, page = 1):
-        m = self.conn.groups.get(group_id = self.id,
+        m = self.conn.groups.getMembers(group_id = self.id,
                                  offset = ((page_items * page) - page_items),
                                  fields = 'first_name,last_name,photo_50,photo_100,photo_200',
                                  count = page_items)
@@ -317,13 +317,14 @@ class KodiVKGUIVideos(object):
                                         'plot'      : v.info['description']
                                         }
                               )
-            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info['photo_320']})
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), v.info.keys()))),)
+            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info[p_key]})
             list_item.setProperty('IsPlayable', 'true')
             v_source = self.__get_video_source_(v)
             if v_source == _VK_VIDEO_SOURCE:
                 params = {'do': _DO_PLAY_VIDEO, 'vid': v.id, 'source': _VK_VIDEO_SOURCE}
                 url = self.root.url(**params)
-            if v_source == _YOUTUBE_VIDEO_SOURCE:
+            elif v_source == _YOUTUBE_VIDEO_SOURCE:
                 if 'files' in v.info.keys():
                     y_url = v.info['files']['external']
                 else:
@@ -335,6 +336,7 @@ class KodiVKGUIVideos(object):
                 y_id = sr[0][1]
                 url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
             else:
+                xbmc.log(repr(v.info))
                 continue
             xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
         if page < vids['pages']:
@@ -398,14 +400,16 @@ class KodiVkGUI:
             g = Group(oid, self.root.conn)
             g.set_info()
             header_string = u'%s [I]%s[/I]' % (self._string(400604).decode('utf-8'), g.info['name'])
-            thumb_url = g.info['photo_200']
-            icon_url = g.info['photo_100']
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), g.info.keys()))),)
+            thumb_url = g.info[p_key]
+            icon_url = g.info[p_key]
         else:
             u = User(oid, self.root.conn)
             u.set_info()
             header_string = u'%s [I]%s %s[/I]' % (self._string(400603).decode('utf-8'), u.info['last_name'], u.info['first_name'])
-            thumb_url = u.info['photo_200']
-            icon_url = u.info['photo_100']
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), u.info.keys()))),)
+            thumb_url = u.info[p_key]
+            icon_url = u.info[p_key]
         list_item = xbmcgui.ListItem(header_string)
         list_item.setArt({'thumb': thumb_url, 'icon': icon_url})
         xbmcplugin.addDirectoryItem(_addon_id, None, list_item, isFolder = False)
@@ -419,10 +423,10 @@ class KodiVkGUI:
             xbmc.log('Unknown content_type: %s' % (c_type,))
             return
         if int(oid) > 0:
-            self.root.add_folder(self._string(400505), {'do': _DO_FRIENDS, 'oid': oid})
+            self.root.add_folder(self._string(400505), {'do': _DO_FRIENDS, 'oid': oid, 'page': 1})
             self.root.add_folder(self._string(400506), {'do': _DO_GROUPS, 'oid': oid, 'page': 1})
         else:
-            self.root.add_folder(self._string(400512), {'do': _DO_MEMBERS, 'oid': oid})
+            self.root.add_folder(self._string(400512), {'do': _DO_MEMBERS, 'oid': -int(oid), 'page': 1})
         xbmcplugin.endOfDirectory(_addon_id)
     def _groups(self):
         oid = self.root.params['oid']
@@ -434,12 +438,51 @@ class KodiVkGUI:
             self.root.add_folder(self.root.gui._string(400602), params)
         for g in groups['items']:
             list_item = xbmcgui.ListItem(g.info['name'])
-            list_item.setArt({'thumb': g.info['photo_100'], 'icon': g.info['photo_200']})
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), g.info.keys()))),)
+            list_item.setArt({'thumb': g.info[p_key], 'icon': g.info[p_key]})
             params = {'do': _DO_HOME, 'oid': -g.id}
             url = self.root.url(**params)
             xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
         if page < groups['pages']:
             params = {'do': _DO_GROUPS, 'oid': oid, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _friends(self):
+        oid = self.root.params['oid']
+        page = int(self.root.params['page'])
+        user = User(oid, self.root.conn)
+        friends = user.friends(page = page)
+        if page < friends['pages']:
+            params = {'do': _DO_FRIENDS, 'oid': oid, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for f in friends['items']:
+            list_item = xbmcgui.ListItem(u'%s %s' % (f.info['last_name'], f.info['first_name']))
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), f.info.keys()))),)
+            list_item.setArt({'thumb': f.info[p_key], 'icon': f.info[p_key]})
+            params = {'do': _DO_HOME, 'oid': f.id}
+            url = self.root.url(**params)
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+        if page < friends['pages']:
+            params = {'do': _DO_FRIENDS, 'oid': oid, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _members(self):
+        oid = self.root.params['oid']
+        page = int(self.root.params['page'])
+        group = Group(oid, self.root.conn)
+        members = group.members(page = page)
+        if page < members['pages']:
+            params = {'do': _DO_MEMBERS, 'oid': oid, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for m in members['items']:
+            list_item = xbmcgui.ListItem(u'%s %s' % (m.info['last_name'], m.info['first_name']))
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), m.info.keys()))),)
+            list_item.setArt({'thumb': m.info[p_key], 'icon': m.info[p_key]})
+            params = {'do': _DO_HOME, 'oid': m.id}
+            url = self.root.url(**params)
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+        if page < members['pages']:
+            params = {'do': _DO_MEMBERS, 'oid': oid, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         xbmcplugin.endOfDirectory(_addon_id)
     
@@ -510,7 +553,9 @@ if __name__ == '__main__':
        _DO_VIDEO: kvk.gui.videos._video,
        _DO_VIDEO_ALBUMS: kvk.gui.videos._video_albums,
        _DO_PLAY_VIDEO: kvk.gui.videos._play_video,
-       _DO_GROUPS: kvk.gui._groups
+       _DO_GROUPS: kvk.gui._groups,
+       _DO_FRIENDS: kvk.gui._friends,
+       _DO_MEMBERS: kvk.gui._members
        }
     
     _do_method = kvk.params['do']
