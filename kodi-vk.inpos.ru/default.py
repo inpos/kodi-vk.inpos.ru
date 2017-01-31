@@ -336,7 +336,6 @@ class KodiVKGUIVideos(object):
                 y_id = sr[0][1]
                 url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
             else:
-                xbmc.log(repr(v.info))
                 continue
             xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
         if page < vids['pages']:
@@ -500,6 +499,14 @@ class KodiVk:
             p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
         self.params = p
         self.c_type = p.get('content_type', None)
+        if not self.c_type:
+            cw_id = xbmcgui.getCurrentWindowId()
+            if cw_id in (10006, 10024, 10025, 10028):
+                self.c_type = _CTYPE_VIDEO
+            elif id in (10005, 10500, 10501, 10502):
+                self.c_type = _CTYPE_AUDIO
+            elif id in (10002,):
+                self.c_type = _CTYPE_IMAGE
     def url(self, params=dict(), **kwparams):
         if self.c_type:
             kwparams['content_type'] = self.c_type
