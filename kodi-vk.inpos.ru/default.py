@@ -498,15 +498,15 @@ class KodiVk:
         if sys.argv[2]:
             p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
         self.params = p
-        self.c_type = p.get('content_type', None)
-        if not self.c_type:
+        if 'content_type' not in self.params.keys():
             cw_id = xbmcgui.getCurrentWindowId()
             if cw_id in (10006, 10024, 10025, 10028):
-                self.c_type = _CTYPE_VIDEO
+                self.params['content_type'] = _CTYPE_VIDEO
             elif id in (10005, 10500, 10501, 10502):
-                self.c_type = _CTYPE_AUDIO
+                self.params['content_type'] = _CTYPE_AUDIO
             elif id in (10002,):
-                self.c_type = _CTYPE_IMAGE
+                self.params['content_type'] = _CTYPE_IMAGE
+        self.c_type = self.params.get('content_type', None)
     def url(self, params=dict(), **kwparams):
         if self.c_type:
             kwparams['content_type'] = self.c_type
