@@ -56,6 +56,21 @@ msgctxt "#400512"
 msgid "Members"
 msgstr "Участники"
 
+msgctxt "#400513"
+msgid "Users"
+msgstr "Пользователи"
+
+msgctxt "#400514"
+msgid "Favorites"
+msgstr "Закладки"
+
+msgctxt "#400515"
+msgid "Search"
+msgstr "Поиск"
+
+msgctxt "#400516"
+msgid "New Search"
+msgstr "[B]Новый поиск[/B]"
 
 msgctxt "#400601"
 msgid "Previous page"

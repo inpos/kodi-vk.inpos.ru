@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import sys, vk, time
+import sys, os, vk, time, pickle, binascii
 from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
 import urlparse
@@ -20,6 +20,15 @@ _SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
 
 _SETTINGS_TOKEN = 'vk_token'
 _SETTINGS_PAGE_ITEMS = 20
+_SETTINGS_MAX_RES = 1080
+_SETTINGS_VIDEO_SEARCH_SORT = 2
+_SETTINGS_VIDEO_SEARCH_HD = 0
+_SETTINGS_VIDEO_SEARCH_ADULT = 0
+
+
+_FILE_VIDEO_SEARCH_HISTORY = _ADDON_NAME + '_vsh.pkl'
+_FILE_GROUP_SEARCH_HISTORY = _ADDON_NAME + '_gsh.pkl'
+_FILE_USER_SEARCH_HISTORY = _ADDON_NAME + '_ush.pkl'
 
 _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
@@ -35,6 +44,8 @@ _DO_HOME = 'home'
 _DO_MAIN_VIDEO = 'main_video'
 _DO_VIDEO = 'video'
 _DO_VIDEO_ALBUMS = 'video_albums'
+_DO_MAIN_VIDEO_SEARCH = 'main_video_search'
+_DO_VIDEO_SEARCH = 'video_search'
 _DO_PLAY_VIDEO = 'play_video'
 _DO_MAIN_AUDIO = 'main_audio'
 _DO_MAIN_PHOTO = 'main_photo'
@@ -43,6 +54,13 @@ _DO_PHOTO_ALBUMS = 'photo_albums'
 _DO_FRIENDS = 'friends'
 _DO_GROUPS = 'groups'
 _DO_MEMBERS = 'members'
+_DO_MAIN_FAVE = 'main_fave'
+_DO_FAVE_VIDEO = 'fave_video'
+_DO_FAVE_PHOTO = 'fave_photo'
+_DO_FAVE_GROUPS = 'fave_groups'
+_DO_FAVE_USERS = 'fave_users'
+
+_NO_OWNER = '__no_owner__'
 
 _VK_VIDEO_SOURCE = 'vk_video'
 _YOUTUBE_VIDEO_SOURCE = 'youtube_video'
@@ -115,16 +133,29 @@ def switch_view():
     elif skin_used == 'skin.aeon.nox':
         xbmc.executebuiltin('Container.SetViewMode(512)') # Вид "Инфо-стена"
 
+def get_search_history(h_file_name):
+    path = os.path.join(xbmc.translatePath('special://temp/').decode('utf-8'), h_file_name.decode('utf-8'))
+    if not os.path.exists(path):
+        return []
+    with open(path, 'rb') as f:
+        history = pickle.load(f)
+    return history
+
+def put_search_history(history, h_file_name):
+    path = os.path.join(xbmc.translatePath('special://temp/').decode('utf-8'), h_file_name.decode('utf-8'))
+    with open(path, 'wb') as f:
+        pickle.dump(history, f, -1)
 
 def media_entries(e_method, conn, oid, **kwargs):
     page_items = kwargs.pop('page_items', _SETTINGS_PAGE_ITEMS)
     page = kwargs.pop('page', 1)
     album = kwargs.pop('album', None)
     kwargs.update({
-              'owner_id': oid,
               'offset': ((page_items * page) - page_items),
               'count': page_items
               })
+    if oid != _NO_OWNER:
+        kwargs['owner_id'] = oid
     if album: kwargs['album_id'] = album
     try:
         entries = getattr(conn, e_method)(**kwargs)
@@ -137,7 +168,7 @@ def media_entries(e_method, conn, oid, **kwargs):
     pages = int(ceil(count / float(page_items)))
     l = []
     for i in entries['items']:
-        if e_method.split('.')[-1] == 'getAlbums':
+        if e_method.split('.')[-1] in ['getAlbums', 'getUsers', 'getLinks']:
             entry_id = str(i['id'])
         else:
             entry_id = str(i['owner_id']) + '_' + str(i['id'])
@@ -198,6 +229,122 @@ class User(object):
             l.append(g)
         return {'pages': pages, 'total': count, 'items': l}
 
+class KodiVKGUIFave(object):
+    def __init__(self, root):
+        self.root = root
+    def _main_fave(self):
+        if self.root.c_type == _CTYPE_VIDEO:
+            self.root.add_folder(self.root.gui._string(400502), {'do': _DO_FAVE_VIDEO, 'page': 1})
+        elif self.root.c_type == _CTYPE_IMAGE:
+            self.root.add_folder(self.root.gui._string(400504), {'do': _DO_FAVE_PHOTO, 'page': 1})
+        self.root.add_folder(self.root.gui._string(400513), {'do': _DO_FAVE_USERS, 'page': 1})
+        self.root.add_folder(self.root.gui._string(400506), {'do': _DO_FAVE_GROUPS, 'page': 1})
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _video(self):
+        page = int(self.root.params['page'])
+        kwargs = {'page': page, 'extended': 1}
+        vids = media_entries('fave.getVideos', self.root.conn, _NO_OWNER, **kwargs)
+        if page < vids['pages']:
+            params = {'do': _DO_FAVE_VIDEO, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for v in vids['items']:
+            list_item = xbmcgui.ListItem(v.info['title'])
+            list_item.setInfo('video', {
+                                        'title'     : v.info['title'],
+                                        'duration'  : int(v.info['duration']),
+                                        'plot'      : v.info['description']
+                                        }
+                              )
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), v.info.keys()))),)
+            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info[p_key]})
+            list_item.setProperty('IsPlayable', 'true')
+            v_source = self.root.gui.videos._get_video_source(v)
+            if v_source == _VK_VIDEO_SOURCE:
+                params = {'do': _DO_PLAY_VIDEO, 'vid': v.id, 'source': _VK_VIDEO_SOURCE}
+                url = self.root.url(**params)
+            elif v_source == _YOUTUBE_VIDEO_SOURCE:
+                if 'files' in v.info.keys():
+                    y_url = v.info['files']['external']
+                else:
+                    y_url = v.info['player']
+                s = re.compile('^http.*youtube.*(v=|\/embed\/)([^\?\&]+)[\?\&]?.*$')
+                sr = s.findall(y_url)
+                if len(sr) < 0:
+                    raise Exception('Unknown youtube url: %s' % (y_url,))
+                y_id = sr[0][1]
+                url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
+            else:
+                continue
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
+        if page < vids['pages']:
+            params = {'do': _DO_FAVE_VIDEO, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _photo(self):
+        page = int(self.root.params['page'])
+        kwargs = {'page': page}
+        photos = media_entries('photos.getAll', self.root.conn, _NO_OWNER, **kwargs)
+        if page < photos['pages']:
+            params = {'do': _DO_FAVE_PHOTO, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for index in range(len(photos['items'])):
+            p = photos['items'][index]
+            num = (_SETTINGS_PAGE_ITEMS * page) + index + 1
+            list_item = xbmcgui.ListItem('%04d' % (num,))
+            p_info = {
+                        'title'     : '%04d' % (num,),
+                        'tagline'      : p.info['text']
+                        }
+            if 'width' in p.info.keys(): p_info['exif:resolution'] = '%d,%d' % (p.info['width'], p.info['height'])
+            list_item.setInfo('pictures', p_info)
+            list_item.setArt({'thumb': p.info['photo_130'], 'icon': p.info['photo_75']})
+            r = map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), p.info.keys()))
+            ### Здесь надо подумать над настройкой
+            url_key = max(r)
+            url = p.info['photo_%d' % (url_key,)]
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
+        if page < photos['pages']:
+            params = {'do': _DO_FAVE_PHOTO, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+        switch_view()
+    def _users(self):
+        page = int(self.root.params['page'])
+        users = media_entries('fave.getUsers', self.root.conn, _NO_OWNER, page = page)
+        if page < users['pages']:
+            params = {'do': _DO_FAVE_USERS, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for u in users['items']:
+            list_item = xbmcgui.ListItem(u'%s %s' % (u.info['last_name'], u.info['first_name']))
+            #p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), m.info.keys()))),)
+            #list_item.setArt({'thumb': m.info[p_key], 'icon': m.info[p_key]})
+            params = {'do': _DO_HOME, 'oid': u.id}
+            url = self.root.url(**params)
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+        if page < users['pages']:
+            params = {'do': _DO_FAVE_USERS, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _groups(self):
+        page = int(self.root.params['page'])
+        links = media_entries('fave.getLinks', self.root.conn, _NO_OWNER, page = page)
+        if page < links['pages']:
+            params = {'do': _DO_FAVE_GROUPS, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        for l in links['items']:
+            l_id = l.info['id'].split('_')
+            if l_id[0] == '2':
+                list_item = xbmcgui.ListItem(l.info['title'])
+                p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), l.info.keys()))),)
+                list_item.setArt({'thumb': l.info[p_key], 'icon': l.info[p_key]})
+                params = {'do': _DO_HOME, 'oid': -int(l_id[-1])}
+                url = self.root.url(**params)
+                xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+        if page < links['pages']:
+            params = {'do': _DO_FAVE_GROUPS, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+
 class KodiVKGUIPhotos(object):
     def __init__(self, root):
         self.root = root
@@ -242,7 +389,7 @@ class KodiVKGUIPhotos(object):
             self.root.add_folder(self.root.gui._string(400602), params)
         for index in range(len(photos['items'])):
             p = photos['items'][index]
-            num = (_SETTINGS_PAGE_ITEMS * page) + index + 1
+            num = (_SETTINGS_PAGE_ITEMS * (page - 1)) + index + 1
             list_item = xbmcgui.ListItem('%04d' % (num,))
             p_info = {
                         'title'     : '%04d' % (num,),
@@ -266,18 +413,109 @@ class KodiVKGUIPhotos(object):
 class KodiVKGUIVideos(object):
     def __init__(self, root):
         self.root = root
-    def __get_video_source_(self, v):
+    def _get_video_source(self, v):
         is_vk_url_re = re.compile('https?\:\/\/[^\/]*vk.com\/.*')
         is_youtube_url_re = re.compile('https\:\/\/www.youtube.com\/.*')
         player_url = v.info['player']
         if len(is_vk_url_re.findall(player_url)) > 0: return _VK_VIDEO_SOURCE
         if len(is_youtube_url_re.findall(player_url)) > 0: return _YOUTUBE_VIDEO_SOURCE
         return _UNKNOWN_VIDEO_SOURCE
+    def _main_video_search(self):
+        page = int(self.root.params['page'])
+        self.root.add_folder(self.root.gui._string(400516), {'do': _DO_VIDEO_SEARCH, 'q':'none', 'page': 1})
+        history = get_search_history(_FILE_VIDEO_SEARCH_HISTORY)
+        count = len(history)
+        pages = int(ceil(count / float(_SETTINGS_PAGE_ITEMS)))
+        if page < pages:
+            params = {'do': _DO_MAIN_VIDEO_SEARCH, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        h_start = _SETTINGS_PAGE_ITEMS * (page -1)
+        h_end = h_start + _SETTINGS_PAGE_ITEMS
+        history = history[h_start:h_end]
+        for h in history:
+            query_hex = binascii.hexlify(pickle.dumps(h, -1))
+            list_item = xbmcgui.ListItem(h)
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': 1}
+            url = self.root.url(**params)
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+        if page < pages:
+            params = {'do': _DO_MAIN_VIDEO_SEARCH, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _video_search(self):
+        page = int(self.root.params['page'])
+        q = self.root.params['q']
+        if q == 'none':
+            s_win = xbmc.Keyboard()
+            s_win.setHeading(self.root.gui._string(400515))
+            s_win.setHiddenInput(False)
+            s_win.doModal()
+            if s_win.isConfirmed():
+                q = s_win.getText()
+            else:
+                raise Exception("Search input was cancelled.")
+        else:
+            q = pickle.loads(binascii.unhexlify(q))
+        history = get_search_history(_FILE_VIDEO_SEARCH_HISTORY)
+        try:
+            del history[history.index(q)]
+        except ValueError:
+            pass
+        history = [q] + history
+        put_search_history(history, _FILE_VIDEO_SEARCH_HISTORY)
+        query_hex = binascii.hexlify(pickle.dumps(q, -1))
+        kwargs = {
+                  'page': page,
+                  'sort': _SETTINGS_VIDEO_SEARCH_SORT,
+                  'hd'  : _SETTINGS_VIDEO_SEARCH_HD,
+                  'adult': _SETTINGS_VIDEO_SEARCH_ADULT,
+                  'q': q
+                  }
+        search_res = media_entries('video.search', self.root.conn, _NO_OWNER, **kwargs)
+        if page < search_res['pages']:
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        self.__create_video_list(search_res)
+        if page < search_res['pages']:
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
     def _main_video(self):
         oid = self.root.params['oid']
         self.root.add_folder(self.root.gui._string(400509), {'do': _DO_VIDEO, 'oid': oid, 'page': 1})
         self.root.add_folder(self.root.gui._string(400510), {'do': _DO_VIDEO_ALBUMS, 'oid': oid, 'page': 1})
+        self.root.add_folder(self.root.gui._string(400515), {'do': _DO_MAIN_VIDEO_SEARCH, 'page': 1})
         xbmcplugin.endOfDirectory(_addon_id)
+    def __create_video_list(self, vids):
+        for v in vids['items']:
+            list_item = xbmcgui.ListItem(v.info['title'])
+            list_item.setInfo('video', {
+                                        'title'     : v.info['title'],
+                                        'duration'  : int(v.info['duration']),
+                                        'plot'      : v.info['description']
+                                        }
+                              )
+            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), v.info.keys()))),)
+            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info[p_key]})
+            list_item.setProperty('IsPlayable', 'true')
+            v_source = self._get_video_source(v)
+            if v_source == _VK_VIDEO_SOURCE:
+                params = {'do': _DO_PLAY_VIDEO, 'vid': v.id, 'source': _VK_VIDEO_SOURCE}
+                url = self.root.url(**params)
+            elif v_source == _YOUTUBE_VIDEO_SOURCE:
+                if 'files' in v.info.keys():
+                    y_url = v.info['files']['external']
+                else:
+                    y_url = v.info['player']
+                s = re.compile('^http.*youtube.*(v=|\/embed\/)([^\?\&]+)[\?\&]?.*$')
+                sr = s.findall(y_url)
+                if len(sr) < 0:
+                    raise Exception('Unknown youtube url: %s' % (y_url,))
+                y_id = sr[0][1]
+                url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
+            else:
+                continue
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
     def _video_albums(self):
         page = int(self.root.params['page'])
         oid = self.root.params['oid']
@@ -309,35 +547,7 @@ class KodiVKGUIVideos(object):
             params = {'do': _DO_VIDEO,'oid': oid,'page': page + 1}
             if album: params['album'] = album
             self.root.add_folder(self.root.gui._string(400602), params)
-        for v in vids['items']:
-            list_item = xbmcgui.ListItem(v.info['title'])
-            list_item.setInfo('video', {
-                                        'title'     : v.info['title'],
-                                        'duration'  : int(v.info['duration']),
-                                        'plot'      : v.info['description']
-                                        }
-                              )
-            p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), v.info.keys()))),)
-            list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info[p_key]})
-            list_item.setProperty('IsPlayable', 'true')
-            v_source = self.__get_video_source_(v)
-            if v_source == _VK_VIDEO_SOURCE:
-                params = {'do': _DO_PLAY_VIDEO, 'vid': v.id, 'source': _VK_VIDEO_SOURCE}
-                url = self.root.url(**params)
-            elif v_source == _YOUTUBE_VIDEO_SOURCE:
-                if 'files' in v.info.keys():
-                    y_url = v.info['files']['external']
-                else:
-                    y_url = v.info['player']
-                s = re.compile('^http.*youtube.*(v=|\/embed\/)([^\?\&]+)[\?\&]?.*$')
-                sr = s.findall(y_url)
-                if len(sr) < 0:
-                    raise Exception('Unknown youtube url: %s' % (y_url,))
-                y_id = sr[0][1]
-                url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
-            else:
-                continue
-            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = False)
+        self.__create_video_list(vids)
         if page < vids['pages']:
             params = {'do': _DO_VIDEO,'oid': oid,'page': page + 1}
             if album: params['album'] = album
@@ -358,7 +568,7 @@ class KodiVKGUIVideos(object):
             if src == _VK_VIDEO_SOURCE:
                 paths = self.root.parse_vk_player_html(v_url)
         ### Здесь должно браться разрешение из настроек
-        k = max(paths.keys())
+        k = max(filter(lambda x: x <= _SETTINGS_MAX_RES, paths.keys()))
         path = paths[k]
         play_item = xbmcgui.ListItem(path = path)
         xbmcplugin.setResolvedUrl(_addon_id, True, listitem = play_item)
@@ -369,6 +579,7 @@ class KodiVkGUI:
         self.root = root
         self.photos = KodiVKGUIPhotos(self.root)
         self.videos = KodiVKGUIVideos(self.root)
+        self.faves = KodiVKGUIFave(self.root)
     def _string(self, string_id):
         return _addon.getLocalizedString(string_id).encode('utf-8')
     def _login_form(self):
@@ -426,6 +637,8 @@ class KodiVkGUI:
             self.root.add_folder(self._string(400506), {'do': _DO_GROUPS, 'oid': oid, 'page': 1})
         else:
             self.root.add_folder(self._string(400512), {'do': _DO_MEMBERS, 'oid': -int(oid), 'page': 1})
+        if oid == self.root.u.id:
+            self.root.add_folder(self._string(400514), {'do': _DO_MAIN_FAVE})
         xbmcplugin.endOfDirectory(_addon_id)
     def _groups(self):
         oid = self.root.params['oid']
@@ -560,9 +773,16 @@ if __name__ == '__main__':
        _DO_VIDEO: kvk.gui.videos._video,
        _DO_VIDEO_ALBUMS: kvk.gui.videos._video_albums,
        _DO_PLAY_VIDEO: kvk.gui.videos._play_video,
+       _DO_MAIN_VIDEO_SEARCH: kvk.gui.videos._main_video_search,
+       _DO_VIDEO_SEARCH: kvk.gui.videos._video_search,
        _DO_GROUPS: kvk.gui._groups,
        _DO_FRIENDS: kvk.gui._friends,
-       _DO_MEMBERS: kvk.gui._members
+       _DO_MEMBERS: kvk.gui._members,
+       _DO_MAIN_FAVE: kvk.gui.faves._main_fave,
+       _DO_FAVE_VIDEO: kvk.gui.faves._video,
+       _DO_FAVE_PHOTO: kvk.gui.faves._photo,
+       _DO_FAVE_USERS: kvk.gui.faves._users,
+       _DO_FAVE_GROUPS: kvk.gui.faves._groups
        }
     
     _do_method = kvk.params['do']

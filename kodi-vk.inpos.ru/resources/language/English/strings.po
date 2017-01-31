@@ -56,7 +56,21 @@ msgctxt "#400512"
 msgid "Members"
 msgstr "Members"
 
+msgctxt "#400513"
+msgid "Users"
+msgstr "Users"
 
+msgctxt "#400514"
+msgid "Favorites"
+msgstr "Favorites"
+
+msgctxt "#400515"
+msgid "Search"
+msgstr "Search"
+
+msgctxt "#400516"
+msgid "New Search"
+msgstr "[B]New Search[/B]"
 
 msgctxt "#400601"
 msgid "Previous page"
