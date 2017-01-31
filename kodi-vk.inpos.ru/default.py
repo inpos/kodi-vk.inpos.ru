@@ -53,7 +53,11 @@ _DO_PHOTO = 'photo'
 _DO_PHOTO_ALBUMS = 'photo_albums'
 _DO_FRIENDS = 'friends'
 _DO_GROUPS = 'groups'
+_DO_MAIN_GROUP_SEARCH = 'main_group_search'
+_DO_GROUP_SEARCH = 'group_search'
 _DO_MEMBERS = 'members'
+_DO_MAIN_USER_SEARCH = 'main_user_search'
+_DO_USER_SEARCH = 'user_search'
 _DO_MAIN_FAVE = 'main_fave'
 _DO_FAVE_VIDEO = 'fave_video'
 _DO_FAVE_PHOTO = 'fave_photo'
@@ -213,12 +217,37 @@ class User(object):
             u.info = i
             l.append(u)
         return {'pages': pages, 'total': count, 'items': l}
-
+    def user_search(self, q = '', page_items = _SETTINGS_PAGE_ITEMS, page = 1):
+        usr = self.conn.users.search(q = q,
+                                   offset = ((page_items * page) - page_items),
+                                   count = page_items,
+                                   fields = 'first_name,last_name,photo_50,photo_100,photo_200')
+        count = usr['count']
+        pages = ceil(count / page_items)
+        l = []
+        for i in usr['items']:
+            u = User(i['id'], self.conn)
+            u.info = i
+            l.append(u)
+        return {'pages': pages, 'total': count, 'items': l}
     def groups(self, page_items = _SETTINGS_PAGE_ITEMS, page = 1):
         gr = self.conn.groups.get(user_id = self.id,
                                  offset = ((page_items * page) - page_items),
                                  count = page_items,
                                  extended = 1)
+        count = gr['count']
+        pages = ceil(count / page_items)
+        l = []
+        for i in gr['items']:
+            if i['is_closed'] > 0 and i['is_member'] == 0: continue
+            g = Group(i['id'], self.conn)
+            g.info = i
+            l.append(g)
+        return {'pages': pages, 'total': count, 'items': l}
+    def group_search(self, q = '', page_items = _SETTINGS_PAGE_ITEMS, page = 1):
+        gr = self.conn.groups.search(q = q,
+                                 offset = ((page_items * page) - page_items),
+                                 count = page_items)
         count = gr['count']
         pages = ceil(count / page_items)
         l = []
@@ -475,7 +504,7 @@ class KodiVKGUIVideos(object):
         if page < search_res['pages']:
             params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
-        self.__create_video_list(search_res)
+        self.__create_video_list_(search_res)
         if page < search_res['pages']:
             params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
@@ -484,9 +513,10 @@ class KodiVKGUIVideos(object):
         oid = self.root.params['oid']
         self.root.add_folder(self.root.gui._string(400509), {'do': _DO_VIDEO, 'oid': oid, 'page': 1})
         self.root.add_folder(self.root.gui._string(400510), {'do': _DO_VIDEO_ALBUMS, 'oid': oid, 'page': 1})
-        self.root.add_folder(self.root.gui._string(400515), {'do': _DO_MAIN_VIDEO_SEARCH, 'page': 1})
+        if int(oid) == self.root.u.id:
+            self.root.add_folder(self.root.gui._string(400515), {'do': _DO_MAIN_VIDEO_SEARCH, 'page': 1})
         xbmcplugin.endOfDirectory(_addon_id)
-    def __create_video_list(self, vids):
+    def __create_video_list_(self, vids):
         for v in vids['items']:
             list_item = xbmcgui.ListItem(v.info['title'])
             list_item.setInfo('video', {
@@ -547,7 +577,7 @@ class KodiVKGUIVideos(object):
             params = {'do': _DO_VIDEO,'oid': oid,'page': page + 1}
             if album: params['album'] = album
             self.root.add_folder(self.root.gui._string(400602), params)
-        self.__create_video_list(vids)
+        self.__create_video_list_(vids)
         if page < vids['pages']:
             params = {'do': _DO_VIDEO,'oid': oid,'page': page + 1}
             if album: params['album'] = album
@@ -640,14 +670,7 @@ class KodiVkGUI:
         if oid == self.root.u.id:
             self.root.add_folder(self._string(400514), {'do': _DO_MAIN_FAVE})
         xbmcplugin.endOfDirectory(_addon_id)
-    def _groups(self):
-        oid = self.root.params['oid']
-        page = int(self.root.params['page'])
-        user = User(oid, self.root.conn)
-        groups = user.groups(page = page)
-        if page < groups['pages']:
-            params = {'do': _DO_GROUPS, 'oid': oid, 'page': page + 1}
-            self.root.add_folder(self.root.gui._string(400602), params)
+    def __create_group_list_(self, groups):
         for g in groups['items']:
             list_item = xbmcgui.ListItem(g.info['name'])
             p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), g.info.keys()))),)
@@ -655,25 +678,40 @@ class KodiVkGUI:
             params = {'do': _DO_HOME, 'oid': -g.id}
             url = self.root.url(**params)
             xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+    def _groups(self):
+        oid = self.root.params['oid']
+        page = int(self.root.params['page'])
+        if int(oid) == self.root.u.id:
+            self.root.add_folder(self.root.gui._string(400515), {'do': _DO_MAIN_GROUP_SEARCH, 'page': 1})
+        user = User(oid, self.root.conn)
+        groups = user.groups(page = page)
+        if page < groups['pages']:
+            params = {'do': _DO_GROUPS, 'oid': oid, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        self.__create_group_list_(groups)
         if page < groups['pages']:
             params = {'do': _DO_GROUPS, 'oid': oid, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         xbmcplugin.endOfDirectory(_addon_id)
-    def _friends(self):
-        oid = self.root.params['oid']
-        page = int(self.root.params['page'])
-        user = User(oid, self.root.conn)
-        friends = user.friends(page = page)
-        if page < friends['pages']:
-            params = {'do': _DO_FRIENDS, 'oid': oid, 'page': page + 1}
-            self.root.add_folder(self.root.gui._string(400602), params)
-        for f in friends['items']:
+    def __create_user_list_(self, users):
+        for f in users['items']:
             list_item = xbmcgui.ListItem(u'%s %s' % (f.info['last_name'], f.info['first_name']))
             p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), f.info.keys()))),)
             list_item.setArt({'thumb': f.info[p_key], 'icon': f.info[p_key]})
             params = {'do': _DO_HOME, 'oid': f.id}
             url = self.root.url(**params)
             xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+    def _friends(self):
+        oid = self.root.params['oid']
+        page = int(self.root.params['page'])
+        if int(oid) == self.root.u.id:
+            self.root.add_folder(self.root.gui._string(400515), {'do': _DO_MAIN_USER_SEARCH, 'page': 1})
+        user = User(oid, self.root.conn)
+        friends = user.friends(page = page)
+        if page < friends['pages']:
+            params = {'do': _DO_FRIENDS, 'oid': oid, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        self.__create_user_list_(friends)
         if page < friends['pages']:
             params = {'do': _DO_FRIENDS, 'oid': oid, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
@@ -697,7 +735,104 @@ class KodiVkGUI:
             params = {'do': _DO_MEMBERS, 'oid': oid, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         xbmcplugin.endOfDirectory(_addon_id)
-    
+    def __create_user_group_search_page_(self, do_current, do_target, h_file):
+        page = int(self.root.params['page'])
+        self.root.add_folder(self.root.gui._string(400516), {'do': do_target, 'q':'none', 'page': 1})
+        history = get_search_history(h_file)
+        count = len(history)
+        pages = int(ceil(count / float(_SETTINGS_PAGE_ITEMS)))
+        if page < pages:
+            params = {'do': do_current, 'page': page + 1}
+            self.root.add_folder(self._string(400602), params)
+        h_start = _SETTINGS_PAGE_ITEMS * (page -1)
+        h_end = h_start + _SETTINGS_PAGE_ITEMS
+        history = history[h_start:h_end]
+        for h in history:
+            query_hex = binascii.hexlify(pickle.dumps(h, -1))
+            list_item = xbmcgui.ListItem(h)
+            params = {'do': do_target, 'q': query_hex, 'page': 1}
+            url = self.root.url(**params)
+            xbmcplugin.addDirectoryItem(_addon_id, url, list_item, isFolder = True)
+        if page < pages:
+            params = {'do': do_current, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _main_group_search(self):
+        self.__create_user_group_search_page_(_DO_MAIN_GROUP_SEARCH, _DO_GROUP_SEARCH, _FILE_GROUP_SEARCH_HISTORY)
+    def _group_search(self):
+        page = int(self.root.params['page'])
+        q = self.root.params['q']
+        if q == 'none':
+            s_win = xbmc.Keyboard()
+            s_win.setHeading(self.root.gui._string(400515))
+            s_win.setHiddenInput(False)
+            s_win.doModal()
+            if s_win.isConfirmed():
+                q = s_win.getText()
+            else:
+                raise Exception("Search input was cancelled.")
+        else:
+            q = pickle.loads(binascii.unhexlify(q))
+        history = get_search_history(_FILE_GROUP_SEARCH_HISTORY)
+        try:
+            del history[history.index(q)]
+        except ValueError:
+            pass
+        history = [q] + history
+        put_search_history(history, _FILE_GROUP_SEARCH_HISTORY)
+        query_hex = binascii.hexlify(pickle.dumps(q, -1))
+        kwargs = {
+                  'page': page,
+                  'q': q
+                  }
+        u = User(self.root.u.id, self.root.conn)
+        search_res = u.group_search(**kwargs)
+        if page < search_res['pages']:
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        self.__create_group_list_(search_res)
+        if page < search_res['pages']:
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
+    def _main_user_search(self):
+        self.__create_user_group_search_page_(_DO_MAIN_USER_SEARCH, _DO_USER_SEARCH, _FILE_USER_SEARCH_HISTORY)
+    def _user_search(self):
+        page = int(self.root.params['page'])
+        q = self.root.params['q']
+        if q == 'none':
+            s_win = xbmc.Keyboard()
+            s_win.setHeading(self.root.gui._string(400515))
+            s_win.setHiddenInput(False)
+            s_win.doModal()
+            if s_win.isConfirmed():
+                q = s_win.getText()
+            else:
+                raise Exception("Search input was cancelled.")
+        else:
+            q = pickle.loads(binascii.unhexlify(q))
+        history = get_search_history(_FILE_USER_SEARCH_HISTORY)
+        try:
+            del history[history.index(q)]
+        except ValueError:
+            pass
+        history = [q] + history
+        put_search_history(history, _FILE_USER_SEARCH_HISTORY)
+        query_hex = binascii.hexlify(pickle.dumps(q, -1))
+        kwargs = {
+                  'page': page,
+                  'q': q
+                  }
+        u = User(self.root.u.id, self.root.conn)
+        search_res = u.user_search(**kwargs)
+        if page < search_res['pages']:
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        self.__create_user_list_(search_res)
+        if page < search_res['pages']:
+            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            self.root.add_folder(self.root.gui._string(400602), params)
+        xbmcplugin.endOfDirectory(_addon_id)
 class KodiVk:
     conn = None
     def __init__(self):
@@ -776,7 +911,11 @@ if __name__ == '__main__':
        _DO_MAIN_VIDEO_SEARCH: kvk.gui.videos._main_video_search,
        _DO_VIDEO_SEARCH: kvk.gui.videos._video_search,
        _DO_GROUPS: kvk.gui._groups,
+       _DO_MAIN_GROUP_SEARCH: kvk.gui._main_group_search,
+       _DO_GROUP_SEARCH: kvk.gui._group_search,
        _DO_FRIENDS: kvk.gui._friends,
+       _DO_MAIN_USER_SEARCH:kvk.gui._main_user_search,
+       _DO_USER_SEARCH: kvk.gui._user_search,
        _DO_MEMBERS: kvk.gui._members,
        _DO_MAIN_FAVE: kvk.gui.faves._main_fave,
        _DO_FAVE_VIDEO: kvk.gui.faves._video,
