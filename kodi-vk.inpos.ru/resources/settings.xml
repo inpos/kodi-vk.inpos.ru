@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <settings>
-	<setting id="vk_token" type="text" label="400507" default="" option="hidden" />
+	<setting id="vk_token" type="text" label="400507" default="" visible="false" />
+	<setting id="video_resolution" type="select" label="400517" default="1080" values="240|360|480|720|1080" />
+	<setting label="400518" type="enum" id="v_search_sort" default="2" lvalues="400519|400520|400521"/>
+	<setting label="400522" type="bool" id="search_hd_video" default="false"/>
+	<setting label="400523" type="bool" id="search_adult_video" default="true"/>
 </settings>

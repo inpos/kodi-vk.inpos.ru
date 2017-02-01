@@ -72,6 +72,34 @@ msgctxt "#400516"
 msgid "New Search"
 msgstr "[B]New Search[/B]"
 
+msgctxt "#400517"
+msgid "Max video res"
+msgstr "Max video resolution"
+
+msgctxt "#400518"
+msgid "Sort video search results by"
+msgstr "Sort video search results by"
+
+msgctxt "#400519"
+msgid "v_search_sort_by_u_date"
+msgstr "Upload date"
+
+msgctxt "#400520"
+msgid "v_search_sort_by_duration"
+msgstr "Duration"
+
+msgctxt "#400521"
+msgid "v_search_sort_by_relevance"
+msgstr "Relevance"
+
+msgctxt "#400522"
+msgid "Search only HD video"
+msgstr "Search only HD video"
+
+msgctxt "#400523"
+msgid "Safe video search"
+msgstr "Safe video search"
+
 msgctxt "#400601"
 msgid "Previous page"
 msgstr "[B]Previous page[/B]"

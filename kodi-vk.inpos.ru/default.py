@@ -4,7 +4,7 @@ from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
 import urlparse
 import urllib2
-from urllib import urlencode
+from urllib import urlencode, urlopen
 import re
 
 _VERSION = '0.0.1'
@@ -18,12 +18,21 @@ _addon_path =   _addon.getAddonInfo('path').decode('utf-8')
 _APP_ID = '4353740'
 _SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
 
-_SETTINGS_TOKEN = 'vk_token'
+
+_SETTINGS_ID_TOKEN = 'vk_token'
+_SETTINGS_ID_MAX_RES = 'video_resolution'
+_SETTINGS_ID_VIDEO_SEARCH_SORT = 'v_search_sort'
+_SETTINGS_ID_VIDEO_SEARCH_HD = 'search_hd_video'
+_SETTINGS_ID_VIDEO_SEARCH_ADULT = 'search_adult_video'
+
+_SETTINGS_BOOL = {'true': 1, 'false': 0}
+_SETTINGS_INV_BOOL = {'true': 0, 'false': 1}
+
 _SETTINGS_PAGE_ITEMS = 20
-_SETTINGS_MAX_RES = 1080
-_SETTINGS_VIDEO_SEARCH_SORT = 2
-_SETTINGS_VIDEO_SEARCH_HD = 0
-_SETTINGS_VIDEO_SEARCH_ADULT = 0
+_SETTINGS_MAX_RES = int(_addon.getSetting(_SETTINGS_ID_MAX_RES))
+_SETTINGS_VIDEO_SEARCH_SORT = int(_addon.getSetting(_SETTINGS_ID_VIDEO_SEARCH_SORT))
+_SETTINGS_VIDEO_SEARCH_HD = _SETTINGS_BOOL[_addon.getSetting(_SETTINGS_ID_VIDEO_SEARCH_HD)]
+_SETTINGS_VIDEO_SEARCH_ADULT = _SETTINGS_INV_BOOL[_addon.getSetting(_SETTINGS_ID_VIDEO_SEARCH_ADULT)]
 
 
 _FILE_VIDEO_SEARCH_HISTORY = _ADDON_NAME + '_vsh.pkl'
@@ -865,7 +874,7 @@ class KodiVk:
         item = xbmcgui.ListItem(name)
         xbmcplugin.addDirectoryItem(_addon_id, url, item, isFolder = True)
     def __connect_(self):
-        token = _addon.getSetting(_SETTINGS_TOKEN)
+        token = _addon.getSetting(_SETTINGS_ID_TOKEN)
         conn = Connection(_APP_ID, access_token = token)
         if not conn.conn._session.access_token:
             token = None
@@ -876,7 +885,7 @@ class KodiVk:
                 try:
                     conn = Connection(_APP_ID, login, password, scope = _SCOPE)
                     token = conn.conn._session.access_token
-                    _addon.setSetting(_SETTINGS_TOKEN, token)
+                    _addon.setSetting(_SETTINGS_ID_TOKEN, token)
                 except vk.api.VkAuthError:
                     continue
         return conn

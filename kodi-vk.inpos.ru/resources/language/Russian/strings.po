@@ -72,6 +72,34 @@ msgctxt "#400516"
 msgid "New Search"
 msgstr "[B]Новый поиск[/B]"
 
+msgctxt "#400517"
+msgid "Max video res"
+msgstr "Макс. разрешение видео"
+
+msgctxt "#400518"
+msgid "Sort video search results by"
+msgstr "Сортировать резултаты поиска видео по"
+
+msgctxt "#400519"
+msgid "v_search_sort_by_u_date"
+msgstr "Дате добавления"
+
+msgctxt "#400520"
+msgid "v_search_sort_by_duration"
+msgstr "Длительности"
+
+msgctxt "#400521"
+msgid "v_search_sort_by_relevance"
+msgstr "Релевантности"
+
+msgctxt "#400522"
+msgid "Search only HD video"
+msgstr "Искать только HD-видео"
+
+msgctxt "#400523"
+msgid "Safe video search"
+msgstr "Безопасный поиск видеозаписей"
+
 msgctxt "#400601"
 msgid "Previous page"
 msgstr "[B]Предыдущая страница[/B]"
