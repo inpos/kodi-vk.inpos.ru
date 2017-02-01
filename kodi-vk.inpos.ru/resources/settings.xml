@@ -4,5 +4,5 @@
 	<setting id="video_resolution" type="select" label="400517" default="1080" values="240|360|480|720|1080" />
 	<setting label="400518" type="enum" id="v_search_sort" default="2" lvalues="400519|400520|400521"/>
 	<setting label="400522" type="bool" id="search_hd_video" default="false"/>
-	<setting label="400523" type="bool" id="search_adult_video" default="true"/>
+	<setting label="400523" type="bool" id="dont_search_adult_video" default="true"/>
 </settings>

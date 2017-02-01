@@ -23,7 +23,7 @@ _SETTINGS_ID_TOKEN = 'vk_token'
 _SETTINGS_ID_MAX_RES = 'video_resolution'
 _SETTINGS_ID_VIDEO_SEARCH_SORT = 'v_search_sort'
 _SETTINGS_ID_VIDEO_SEARCH_HD = 'search_hd_video'
-_SETTINGS_ID_VIDEO_SEARCH_ADULT = 'search_adult_video'
+_SETTINGS_ID_VIDEO_SEARCH_ADULT = 'dont_search_adult_video'
 
 _SETTINGS_BOOL = {'true': 1, 'false': 0}
 _SETTINGS_INV_BOOL = {'true': 0, 'false': 1}
