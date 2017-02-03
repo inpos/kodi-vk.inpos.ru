@@ -601,7 +601,7 @@ class KodiVKGUIVideos(object):
             paths = {}
             if src == _VK_VIDEO_SOURCE:
                 for k in v.info['files'].keys():
-                    paths[k.split('_')[1]] = v.info['files'][k]   
+                    paths[int(k.split('_')[1])] = v.info['files'][k]   
         else:
             v_url = v.info['player']
             if src == _VK_VIDEO_SOURCE:
