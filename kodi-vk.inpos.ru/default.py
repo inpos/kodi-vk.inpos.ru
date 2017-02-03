@@ -4,10 +4,10 @@ from math import ceil
 import xbmc, xbmcplugin, xbmcaddon, xbmcgui
 import urlparse
 import urllib2
-from urllib import urlencode, urlopen
+from urllib import urlencode
 import re
 
-_VERSION = '0.0.1'
+_VERSION = '1.0.0'
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
