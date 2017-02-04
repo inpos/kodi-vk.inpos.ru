@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon id="kodi-vk.inpos.ru"
-version="1.0.1"
+version="1.0.2"
 name="VK Add-on"
 provider-name="inpos">
 <requires>
@@ -8,7 +8,7 @@ provider-name="inpos">
   <import addon="script.module.vk"/>
 </requires>
 <extension point="xbmc.python.pluginsource" library="default.py">
-  <provides>image video audio</provides>
+  <provides>image video</provides>
 </extension>
 <extension point="xbmc.addon.metadata"> 
   <summary lang="en">Vkontakte for Kodi</summary>

@@ -664,8 +664,8 @@ class KodiVkGUI:
         xbmcplugin.addDirectoryItem(_addon_id, None, list_item, isFolder = False)
         if c_type == _CTYPE_VIDEO:
             self.root.add_folder(self._string(400502), {'do': _DO_MAIN_VIDEO, 'oid': oid})
-        elif c_type == _CTYPE_AUDIO:
-            self.root.add_folder(self._string(400503), {'do': _DO_MAIN_AUDIO, 'oid': oid})
+        #elif c_type == _CTYPE_AUDIO:
+        #    self.root.add_folder(self._string(400503), {'do': _DO_MAIN_AUDIO, 'oid': oid})
         elif c_type == _CTYPE_IMAGE:
             self.root.add_folder(self._string(400504), {'do': _DO_MAIN_PHOTO, 'oid': oid})
         else:
@@ -859,8 +859,8 @@ class KodiVk:
             cw_id = xbmcgui.getCurrentWindowId()
             if cw_id in (10006, 10024, 10025, 10028):
                 self.params['content_type'] = _CTYPE_VIDEO
-            elif id in (10005, 10500, 10501, 10502):
-                self.params['content_type'] = _CTYPE_AUDIO
+            #elif id in (10005, 10500, 10501, 10502):
+            #    self.params['content_type'] = _CTYPE_AUDIO
             elif id in (10002,):
                 self.params['content_type'] = _CTYPE_IMAGE
         self.c_type = self.params.get('content_type', None)
