@@ -100,6 +100,30 @@ msgctxt "#400523"
 msgid "Safe video search"
 msgstr "Безопасный поиск видеозаписей"
 
+msgctxt "#400524"
+msgid "Video does not exist"
+msgstr "Видеозапись отсутствует"
+
+msgctxt "#400525"
+msgid "Cancelled"
+msgstr "Отменено"
+
+msgctxt "#400526"
+msgid "Logout"
+msgstr "[COLOR blue]Выход из учётной записи[/COLOR]"
+
+msgctxt "#400527"
+msgid "Logout_note"
+msgstr "Чтобы пользоваться kodi-vk после выхода, необходимо будет снова ввести логин и пароль\n             Действительно выйти?"
+
+msgctxt "#400528"
+msgid "Yes"
+msgstr "Да"
+
+msgctxt "#400529"
+msgid "No"
+msgstr "Нет"
+
 msgctxt "#400601"
 msgid "Previous page"
 msgstr "[B]Предыдущая страница[/B]"

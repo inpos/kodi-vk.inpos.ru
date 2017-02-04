@@ -100,6 +100,30 @@ msgctxt "#400523"
 msgid "Safe video search"
 msgstr "Safe video search"
 
+msgctxt "#400524"
+msgid "Video does not exist"
+msgstr "Video does not exist"
+
+msgctxt "#400525"
+msgid "Cancelled"
+msgstr "Cancelled"
+
+msgctxt "#400526"
+msgid "Logout"
+msgstr "[COLOR blue]Logout[/COLOR]"
+
+msgctxt "#400527"
+msgid "Logout_note"
+msgstr "To use kodi-vk after logout you need to enter login and password again\n             Confirm logout?"
+
+msgctxt "#400528"
+msgid "Yes"
+msgstr "Yes"
+
+msgctxt "#400529"
+msgid "No"
+msgstr "No"
+
 msgctxt "#400601"
 msgid "Previous page"
 msgstr "[B]Previous page[/B]"

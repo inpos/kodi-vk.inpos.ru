@@ -72,6 +72,7 @@ _DO_FAVE_VIDEO = 'fave_video'
 _DO_FAVE_PHOTO = 'fave_photo'
 _DO_FAVE_GROUPS = 'fave_groups'
 _DO_FAVE_USERS = 'fave_users'
+_DO_LOGOUT = 'logout'
 
 _NO_OWNER = '__no_owner__'
 
@@ -296,7 +297,13 @@ class KodiVKGUIFave(object):
             p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), v.info.keys()))),)
             list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info[p_key]})
             list_item.setProperty('IsPlayable', 'true')
-            v_source = self.root.gui.videos._get_video_source(v)
+            if 'files' in v.info.keys():
+                if 'external' in v.info['files']:
+                    v_source = self.root.gui.videos._get_video_source(v.info['files']['external'])
+                else:
+                    v_source = _VK_VIDEO_SOURCE
+            else:
+                v_source = self.root.gui.videos._get_video_source(v.info['player'])
             if v_source == _VK_VIDEO_SOURCE:
                 params = {'do': _DO_PLAY_VIDEO, 'vid': v.id, 'source': _VK_VIDEO_SOURCE}
                 url = self.root.url(**params)
@@ -308,7 +315,8 @@ class KodiVKGUIFave(object):
                 s = re.compile('^http.*youtube.*(v=|\/embed\/)([^\?\&]+)[\?\&]?.*$')
                 sr = s.findall(y_url)
                 if len(sr) < 0:
-                    raise Exception('Unknown youtube url: %s' % (y_url,))
+                    xbmc.log('WARN: Unknown youtube url: %s' % (y_url,))
+                    continue
                 y_id = sr[0][1]
                 url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
             else:
@@ -451,12 +459,11 @@ class KodiVKGUIPhotos(object):
 class KodiVKGUIVideos(object):
     def __init__(self, root):
         self.root = root
-    def _get_video_source(self, v):
+    def _get_video_source(self, v_url):
         is_vk_url_re = re.compile('https?\:\/\/[^\/]*vk.com\/.*')
         is_youtube_url_re = re.compile('https\:\/\/www.youtube.com\/.*')
-        player_url = v.info['player']
-        if len(is_vk_url_re.findall(player_url)) > 0: return _VK_VIDEO_SOURCE
-        if len(is_youtube_url_re.findall(player_url)) > 0: return _YOUTUBE_VIDEO_SOURCE
+        if len(is_vk_url_re.findall(v_url)) > 0: return _VK_VIDEO_SOURCE
+        if len(is_youtube_url_re.findall(v_url)) > 0: return _YOUTUBE_VIDEO_SOURCE
         return _UNKNOWN_VIDEO_SOURCE
     def _main_video_search(self):
         page = int(self.root.params['page'])
@@ -491,7 +498,8 @@ class KodiVKGUIVideos(object):
             if s_win.isConfirmed():
                 q = s_win.getText()
             else:
-                raise Exception("Search input was cancelled.")
+                self.root.gui.notify(self.root.gui._string(400525), '')
+                return
         else:
             q = pickle.loads(binascii.unhexlify(q))
         history = get_search_history(_FILE_VIDEO_SEARCH_HISTORY)
@@ -537,7 +545,13 @@ class KodiVKGUIVideos(object):
             p_key = 'photo_%d' % (max(map(lambda x: int(x.split('_')[1]), filter(lambda x: x.startswith('photo_'), v.info.keys()))),)
             list_item.setArt({'thumb': v.info['photo_130'], 'icon': v.info['photo_130'], 'fanart': v.info[p_key]})
             list_item.setProperty('IsPlayable', 'true')
-            v_source = self._get_video_source(v)
+            if 'files' in v.info.keys():
+                if 'external' in v.info['files']:
+                    v_source = self._get_video_source(v.info['files']['external'])
+                else:
+                    v_source = _VK_VIDEO_SOURCE
+            else:
+                v_source = self._get_video_source(v.info['player'])
             if v_source == _VK_VIDEO_SOURCE:
                 params = {'do': _DO_PLAY_VIDEO, 'vid': v.id, 'source': _VK_VIDEO_SOURCE}
                 url = self.root.url(**params)
@@ -549,7 +563,8 @@ class KodiVKGUIVideos(object):
                 s = re.compile('^http.*youtube.*(v=|\/embed\/)([^\?\&]+)[\?\&]?.*$')
                 sr = s.findall(y_url)
                 if len(sr) < 0:
-                    raise Exception('Unknown youtube url: %s' % (y_url,))
+                    xbmc.log('WARN: Unknown youtube url: %s' % (y_url,))
+                    continue
                 y_id = sr[0][1]
                 url = u'plugin://plugin.video.youtube/?action=play_video&videoid=' + y_id
             else:
@@ -596,7 +611,11 @@ class KodiVKGUIVideos(object):
         vid = self.root.params['vid']
         src = self.root.params['source']
         v = Entry('video.get', vid, self.root.conn)
-        v.set_info()
+        try:
+            v.set_info()
+        except:
+            self.root.gui.notify(self.root.gui._string(400524), '')
+            return
         if 'files' in v.info.keys():
             paths = {}
             if src == _VK_VIDEO_SOURCE:
@@ -619,6 +638,10 @@ class KodiVkGUI:
         self.photos = KodiVKGUIPhotos(self.root)
         self.videos = KodiVKGUIVideos(self.root)
         self.faves = KodiVKGUIFave(self.root)
+    def notify(self,title, msg):
+        dialog = xbmcgui.Dialog()
+        dialog.notification(title, msg,
+                            xbmcgui.NOTIFICATION_WARNING, 3000)
     def _string(self, string_id):
         return _addon.getLocalizedString(string_id).encode('utf-8')
     def _login_form(self):
@@ -678,6 +701,10 @@ class KodiVkGUI:
             self.root.add_folder(self._string(400512), {'do': _DO_MEMBERS, 'oid': -int(oid), 'page': 1})
         if oid == self.root.u.id:
             self.root.add_folder(self._string(400514), {'do': _DO_MAIN_FAVE})
+        xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
+        xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
+        xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
+        self.root.add_folder(self._string(400526), {'do': _DO_LOGOUT})
         xbmcplugin.endOfDirectory(_addon_id)
     def __create_group_list_(self, groups):
         for g in groups['items']:
@@ -773,13 +800,14 @@ class KodiVkGUI:
         q = self.root.params['q']
         if q == 'none':
             s_win = xbmc.Keyboard()
-            s_win.setHeading(self.root.gui._string(400515))
+            s_win.setHeading(self._string(400515))
             s_win.setHiddenInput(False)
             s_win.doModal()
             if s_win.isConfirmed():
                 q = s_win.getText()
             else:
-                raise Exception("Search input was cancelled.")
+                self.notify(self._string(400525), '')
+                return
         else:
             q = pickle.loads(binascii.unhexlify(q))
         history = get_search_history(_FILE_GROUP_SEARCH_HISTORY)
@@ -817,7 +845,8 @@ class KodiVkGUI:
             if s_win.isConfirmed():
                 q = s_win.getText()
             else:
-                raise Exception("Search input was cancelled.")
+                self.notify(self._string(400525), '')
+                return
         else:
             q = pickle.loads(binascii.unhexlify(q))
         history = get_search_history(_FILE_USER_SEARCH_HISTORY)
@@ -842,11 +871,21 @@ class KodiVkGUI:
             params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         xbmcplugin.endOfDirectory(_addon_id)
+    def _logout(self):
+        dialog = xbmcgui.Dialog()
+        ret = dialog.yesno(self._string(400526), self._string(400527), nolabel=self._string(400529), yeslabel=self._string(400528))
+        if ret:
+            _addon.setSetting(_SETTINGS_ID_TOKEN, '')
+            xbmc.executebuiltin("XBMC.Container.Update(path,replace)")
+            xbmc.executebuiltin("XBMC.ActivateWindow(Home)")
+        else:
+            return
 class KodiVk:
     conn = None
     def __init__(self):
         self.gui = KodiVkGUI(self)
         self.conn = self.__connect_()
+        if not self.conn: raise Exception()
         u_info = self.conn.users.get()[0]
         self.u = User(u_info['id'], self.conn)
         self.u.set_info()
@@ -881,13 +920,18 @@ class KodiVk:
             count = _LOGIN_RETRY
             while not token and count > 0:
                 count -= 1
-                login, password = self.gui._login_form()
+                try:
+                    login, password = self.gui._login_form()
+                except:
+                    self.gui.notify(self.gui._string(400525), '')
                 try:
                     conn = Connection(_APP_ID, login, password, scope = _SCOPE)
                     token = conn.conn._session.access_token
                     _addon.setSetting(_SETTINGS_ID_TOKEN, token)
                 except vk.api.VkAuthError:
                     continue
+            if not token:
+                return
         return conn
     def parse_vk_player_html(self, v_url):
         p = re.compile('"url(\d+)":"([^"]+)"')
@@ -906,8 +950,10 @@ class KodiVk:
         return res
 
 if __name__ == '__main__':
-    kvk = KodiVk()
-    
+    try:
+        kvk = KodiVk()
+    except Exception, e:
+        sys.exit()
     _DO = {
        _DO_HOME: kvk.gui._home,
        _DO_MAIN_PHOTO: kvk.gui.photos._main_photo,
@@ -930,7 +976,8 @@ if __name__ == '__main__':
        _DO_FAVE_VIDEO: kvk.gui.faves._video,
        _DO_FAVE_PHOTO: kvk.gui.faves._photo,
        _DO_FAVE_USERS: kvk.gui.faves._users,
-       _DO_FAVE_GROUPS: kvk.gui.faves._groups
+       _DO_FAVE_GROUPS: kvk.gui.faves._groups,
+       _DO_LOGOUT: kvk.gui._logout
        }
     
     _do_method = kvk.params['do']
