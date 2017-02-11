@@ -7,7 +7,7 @@ import urllib2
 from urllib import urlencode
 import re
 
-_VERSION = '1.0.0'
+_VERSION = '1.1.3'
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
@@ -701,10 +701,10 @@ class KodiVkGUI:
             self.root.add_folder(self._string(400512), {'do': _DO_MEMBERS, 'oid': -int(oid), 'page': 1})
         if oid == self.root.u.id:
             self.root.add_folder(self._string(400514), {'do': _DO_MAIN_FAVE})
-        xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
-        xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
-        xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
-        self.root.add_folder(self._string(400526), {'do': _DO_LOGOUT})
+            xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
+            xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
+            xbmcplugin.addDirectoryItem(_addon_id, None, xbmcgui.ListItem(''), isFolder = False)
+            self.root.add_folder(self._string(400526), {'do': _DO_LOGOUT})
         xbmcplugin.endOfDirectory(_addon_id)
     def __create_group_list_(self, groups):
         for g in groups['items']:
