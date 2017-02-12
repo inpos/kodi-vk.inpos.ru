@@ -125,8 +125,8 @@ msgid "No"
 msgstr "No"
 
 msgctxt "#400530"
-msgid "List length"
-msgstr "List length"
+msgid "Items per Page"
+msgstr "Items per page"
 
 msgctxt "#400601"
 msgid "Previous page"

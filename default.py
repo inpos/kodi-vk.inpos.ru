@@ -7,7 +7,7 @@ import urllib2
 from urllib import urlencode
 import re
 
-_VERSION = '1.2.0'
+_VERSION = '1.2.1'
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
