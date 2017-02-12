@@ -7,7 +7,7 @@ import urllib2
 from urllib import urlencode
 import re
 
-_VERSION = '1.1.3'
+_VERSION = '1.2.0'
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
@@ -21,6 +21,7 @@ _SCOPE  = 'friends,photos,audio,video,groups,messages,offline'
 
 _SETTINGS_ID_TOKEN = 'vk_token'
 _SETTINGS_ID_MAX_RES = 'video_resolution'
+_SETTINGS_ID_LIST_LEN = 'list_len'
 _SETTINGS_ID_VIDEO_SEARCH_SORT = 'v_search_sort'
 _SETTINGS_ID_VIDEO_SEARCH_HD = 'search_hd_video'
 _SETTINGS_ID_VIDEO_SEARCH_ADULT = 'dont_search_adult_video'
@@ -28,7 +29,7 @@ _SETTINGS_ID_VIDEO_SEARCH_ADULT = 'dont_search_adult_video'
 _SETTINGS_BOOL = {'true': 1, 'false': 0}
 _SETTINGS_INV_BOOL = {'true': 0, 'false': 1}
 
-_SETTINGS_PAGE_ITEMS = 20
+_SETTINGS_PAGE_ITEMS = int(_addon.getSetting(_SETTINGS_ID_LIST_LEN))
 _SETTINGS_MAX_RES = int(_addon.getSetting(_SETTINGS_ID_MAX_RES))
 _SETTINGS_VIDEO_SEARCH_SORT = int(_addon.getSetting(_SETTINGS_ID_VIDEO_SEARCH_SORT))
 _SETTINGS_VIDEO_SEARCH_HD = _SETTINGS_BOOL[_addon.getSetting(_SETTINGS_ID_VIDEO_SEARCH_HD)]
@@ -189,7 +190,12 @@ def media_entries(e_method, conn, oid, **kwargs):
         e = Entry(e_method, entry_id, conn)
         e.info = i
         l.append(e)
-    return {'pages': pages, 'total': count, 'items': l}
+    del entries['count']
+    del entries['items']
+    res = {'pages': pages, 'total': count, 'items': l}
+    for k in entries.keys():
+        res[k] = entries[k]
+    return res
 
 class Entry(object):
     def __init__(self, e_method, eid, conn):
@@ -515,7 +521,8 @@ class KodiVKGUIVideos(object):
                   'sort': _SETTINGS_VIDEO_SEARCH_SORT,
                   'hd'  : _SETTINGS_VIDEO_SEARCH_HD,
                   'adult': _SETTINGS_VIDEO_SEARCH_ADULT,
-                  'q': q
+                  'q': q,
+                  'extended': 1
                   }
         search_res = media_entries('video.search', self.root.conn, _NO_OWNER, **kwargs)
         if page < search_res['pages']:
@@ -536,6 +543,17 @@ class KodiVKGUIVideos(object):
     def __create_video_list_(self, vids):
         for v in vids['items']:
             list_item = xbmcgui.ListItem(v.info['title'])
+            oid = v.info['owner_id']
+            if int(oid) < 0:
+                gid = oid * -1
+                g = filter(lambda x: x['id'] == gid, vids['groups'])[0]
+                cm_title = u'%s [I]%s[/I]' % (self.root.gui._string(400604).decode('utf-8'), g['name'])
+            else:
+                u = filter(lambda x: x['id'] == oid, vids['profiles'])[0]
+                cm_title = u'%s [I]%s %s[/I]' % (self.root.gui._string(400603).decode('utf-8'), u['last_name'], u['first_name'])
+            cm_params = {'do': _DO_HOME, 'oid': oid}
+            cm_url = self.root.url(**cm_params)
+            list_item.addContextMenuItems([(cm_title, 'xbmc.Container.update(%s)' % (cm_url,))])
             list_item.setInfo('video', {
                                         'title'     : v.info['title'],
                                         'duration'  : int(v.info['duration']),
@@ -573,7 +591,10 @@ class KodiVKGUIVideos(object):
     def _video_albums(self):
         page = int(self.root.params['page'])
         oid = self.root.params['oid']
-        kwargs = {'page': page, 'extended': 1}
+        kwargs = {
+                    'page': page,
+                    'extended': 1
+                    }
         albums = media_entries('video.getAlbums', self.root.conn, oid, **kwargs)
         if page < albums['pages']:
             params = {'do': _DO_VIDEO_ALBUMS,'oid': oid,'page': page + 1}
@@ -594,7 +615,7 @@ class KodiVKGUIVideos(object):
         page = int(self.root.params['page'])
         oid = self.root.params['oid']
         album = self.root.params.get('album', None)
-        kwargs = {'page': page}
+        kwargs = {'page': page, 'extended': 1}
         if album: kwargs['album'] = album
         vids = media_entries('video.get', self.root.conn, oid, **kwargs)
         if page < vids['pages']:
@@ -684,7 +705,8 @@ class KodiVkGUI:
             icon_url = u.info[p_key]
         list_item = xbmcgui.ListItem(header_string)
         list_item.setArt({'thumb': thumb_url, 'icon': icon_url})
-        xbmcplugin.addDirectoryItem(_addon_id, None, list_item, isFolder = False)
+        h_url = self.root.url({'do': _DO_HOME, 'oid': oid})
+        xbmcplugin.addDirectoryItem(_addon_id, h_url, list_item, isFolder = True)
         if c_type == _CTYPE_VIDEO:
             self.root.add_folder(self._string(400502), {'do': _DO_MAIN_VIDEO, 'oid': oid})
         #elif c_type == _CTYPE_AUDIO:
@@ -890,9 +912,9 @@ class KodiVk:
         self.u = User(u_info['id'], self.conn)
         self.u.set_info()
         p = {'do': _DO_HOME}
-        p['oid'] = self.u.info['id']
         if sys.argv[2]:
             p.update(dict(urlparse.parse_qsl(sys.argv[2][1:])))
+        p['oid'] = int(p.get('oid', self.u.info['id']))
         self.params = p
         if 'content_type' not in self.params.keys():
             cw_id = xbmcgui.getCurrentWindowId()

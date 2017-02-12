@@ -124,6 +124,10 @@ msgctxt "#400529"
 msgid "No"
 msgstr "No"
 
+msgctxt "#400530"
+msgid "List length"
+msgstr "List length"
+
 msgctxt "#400601"
 msgid "Previous page"
 msgstr "[B]Previous page[/B]"

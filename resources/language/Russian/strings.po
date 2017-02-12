@@ -124,6 +124,10 @@ msgctxt "#400529"
 msgid "No"
 msgstr "Нет"
 
+msgctxt "#400530"
+msgid "List length"
+msgstr "Длина списка"
+
 msgctxt "#400601"
 msgid "Previous page"
 msgstr "[B]Предыдущая страница[/B]"
