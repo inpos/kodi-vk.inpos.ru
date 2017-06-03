@@ -937,6 +937,13 @@ class KodiVk:
     def __connect_(self):
         token = _addon.getSetting(_SETTINGS_ID_TOKEN)
         conn = Connection(_APP_ID, access_token = token)
+        try:
+            tmp__ = conn.users.get()[0]
+        except vk.exceptions.VkAPIError, e:
+            if e.code == 5:
+                conn.conn._session.access_token = None
+            else:
+                raise
         if not conn.conn._session.access_token:
             token = None
             count = _LOGIN_RETRY
