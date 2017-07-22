@@ -132,7 +132,7 @@ class Group(object):
                                  fields = 'first_name,last_name,photo_50,photo_100,photo_200',
                                  count = page_items)
         count = m['count']
-        pages = ceil(count / page_items)
+        pages = ceil(float(count) / float(page_items))
         l = []
         for i in m['items']:
             member = User(i['id'], self.conn)
@@ -226,7 +226,7 @@ class User(object):
                                    fields = 'first_name,last_name,photo_50,photo_100,photo_200',
                                    order = order)
         count = f['count']
-        pages = ceil(count / page_items)
+        pages = ceil(float(count) / float(page_items))
         l = []
         for i in f['items']:
             u = User(i['id'], self.conn)
@@ -239,7 +239,7 @@ class User(object):
                                    count = page_items,
                                    fields = 'first_name,last_name,photo_50,photo_100,photo_200')
         count = usr['count']
-        pages = ceil(count / page_items)
+        pages = ceil(float(count) / float(page_items))
         l = []
         for i in usr['items']:
             u = User(i['id'], self.conn)
@@ -252,7 +252,7 @@ class User(object):
                                  count = page_items,
                                  extended = 1)
         count = gr['count']
-        pages = ceil(count / page_items)
+        pages = ceil(float(count) / float(page_items))
         l = []
         for i in gr['items']:
             if i['is_closed'] > 0 and i['is_member'] == 0: continue
@@ -265,7 +265,7 @@ class User(object):
                                  offset = ((page_items * page) - page_items),
                                  count = page_items)
         count = gr['count']
-        pages = ceil(count / page_items)
+        pages = ceil(float(count) / float(page_items))
         l = []
         for i in gr['items']:
             if i['is_closed'] > 0 and i['is_member'] == 0: continue
