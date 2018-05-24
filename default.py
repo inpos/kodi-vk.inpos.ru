@@ -7,7 +7,7 @@ import urllib2
 from urllib import urlencode
 import re
 
-_VERSION = '1.2.1'
+_VERSION = '1.2.5'
 
 _ADDON_NAME =   'kodi-vk.inpos.ru'
 _addon      =   xbmcaddon.Addon(id = _ADDON_NAME)
@@ -641,7 +641,7 @@ class KodiVKGUIVideos(object):
             paths = {}
             if src == _VK_VIDEO_SOURCE:
                 for k in v.info['files'].keys():
-                    paths[int(k.split('_')[1])] = v.info['files'][k]   
+                    paths[int(k.split('_')[1])] = v.info['files'][k]
         else:
             v_url = v.info['player']
             if src == _VK_VIDEO_SOURCE:
@@ -847,11 +847,11 @@ class KodiVkGUI:
         u = User(self.root.u.id, self.root.conn)
         search_res = u.group_search(**kwargs)
         if page < search_res['pages']:
-            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            params = {'do': _DO_GROUP_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         self.__create_group_list_(search_res)
         if page < search_res['pages']:
-            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            params = {'do': _DO_GROUP_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         xbmcplugin.endOfDirectory(_addon_id)
     def _main_user_search(self):
@@ -886,11 +886,11 @@ class KodiVkGUI:
         u = User(self.root.u.id, self.root.conn)
         search_res = u.user_search(**kwargs)
         if page < search_res['pages']:
-            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            params = {'do': _DO_USER_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         self.__create_user_list_(search_res)
         if page < search_res['pages']:
-            params = {'do': _DO_VIDEO_SEARCH, 'q': query_hex, 'page': page + 1}
+            params = {'do': _DO_USER_SEARCH, 'q': query_hex, 'page': page + 1}
             self.root.add_folder(self.root.gui._string(400602), params)
         xbmcplugin.endOfDirectory(_addon_id)
     def _logout(self):
@@ -941,10 +941,10 @@ class KodiVk:
             tmp__ = conn.users.get()[0]
         except vk.exceptions.VkAPIError, e:
             if e.code == 5:
-                conn.conn._session.access_token = None
+                token = None
             else:
                 raise
-        if not conn.conn._session.access_token:
+        if not token:
             token = None
             count = _LOGIN_RETRY
             while not token and count > 0:
@@ -1008,7 +1008,7 @@ if __name__ == '__main__':
        _DO_FAVE_GROUPS: kvk.gui.faves._groups,
        _DO_LOGOUT: kvk.gui._logout
        }
-    
+
     _do_method = kvk.params['do']
     if _do_method in _DO.keys():
         _DO[_do_method]()
