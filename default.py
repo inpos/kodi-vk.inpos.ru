@@ -42,7 +42,7 @@ _FILE_USER_SEARCH_HISTORY = _ADDON_NAME + '_ush.pkl'
 
 _USERNAME = 'vk_username'
 _LOGIN_RETRY = 3
-_VK_API_VERSION = '5.62'
+_VK_API_VERSION = '5.95'
 
 _PHOTO_THUMB_KEY = 'photo_130'
 
@@ -641,7 +641,14 @@ class KodiVKGUIVideos(object):
             paths = {}
             if src == _VK_VIDEO_SOURCE:
                 for k in v.info['files'].keys():
-                    paths[int(k.split('_')[1])] = v.info['files'][k]
+                    if '_' not in k:
+                        try:
+                            local_idx = int(k)
+                        except:
+                            continue
+                    else:
+                        local_idx = int(k.split('_')[1])
+                    paths[local_idx] = v.info['files'][k]
         else:
             v_url = v.info['player']
             if src == _VK_VIDEO_SOURCE:
